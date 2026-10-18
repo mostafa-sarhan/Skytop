@@ -14,6 +14,10 @@ export const list = async (req: Request, res: Response): Promise<void> => {
   paginated(res, await pilgrimService.listPilgrims(query));
 };
 
+export const filterOptions = async (_req: Request, res: Response): Promise<void> => {
+  ok(res, await pilgrimService.pilgrimFilterOptions());
+};
+
 export const getById = async (req: Request, res: Response): Promise<void> => {
   const { id } = getParams<{ id: string }>(req);
   ok(res, await pilgrimService.getPilgrimById(id));

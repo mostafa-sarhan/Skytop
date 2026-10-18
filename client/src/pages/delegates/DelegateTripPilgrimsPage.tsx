@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, errorMessage } from '../../api/client';
+import { api } from '../../api/client';
 import type { DelegateTripPilgrim, DelegateTripPilgrims, PilgrimStatus } from '../../api/types';
-import { useAsync, validationMessages } from '../../lib/hooks';
+import { useAsync } from '../../lib/hooks';
 import {
   documentStatusLabel,
   flightTypeLabel,
@@ -18,90 +18,12 @@ import {
   Field,
   Icon,
   LoadingBlock,
-  Modal,
   PageHeader,
   SelectInput,
   Tabs,
   TextInput,
 } from '../../ui/primitives';
-import { useToast } from '../../ui/Toast';
-import { TransferModal } from '../pilgrims/PilgrimDetailPage';
-
-/** استبعاد: confirmation with a required reason. Nothing is deleted. */
-const CancelPilgrimModal = ({
-  pilgrim,
-  tripName,
-  onClose,
-  onDone,
-}: {
-  pilgrim: DelegateTripPilgrim;
-  tripName: string;
-  onClose: () => void;
-  onDone: () => void;
-}) => {
-  const toast = useToast();
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async () => {
-    setSubmitting(true);
-    setError('');
-    setFieldErrors({});
-    try {
-      await api.post(`/pilgrims/${pilgrim.id}/cancel`, { reason: reason.trim() });
-      toast.success(`تم استبعاد المعتمر ${pilgrim.name}`);
-      onDone();
-      onClose();
-    } catch (err) {
-      setFieldErrors(validationMessages(err));
-      setError(errorMessage(err, 'تعذر استبعاد المعتمر'));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal
-      title="استبعاد معتمر"
-      onClose={onClose}
-      size="narrow"
-      footer={
-        <>
-          <button type="button" className="btn secondary" onClick={onClose}>
-            رجوع
-          </button>
-          <button
-            type="button"
-            className="btn danger"
-            onClick={() => void submit()}
-            disabled={submitting || reason.trim().length < 3}
-          >
-            {submitting ? 'جارٍ الاستبعاد...' : 'تأكيد الاستبعاد'}
-          </button>
-        </>
-      }
-    >
-      {error ? <div className="alert error">{error}</div> : null}
-      <dl className="kv">
-        <dt>المعتمر</dt>
-        <dd>
-          <strong>{pilgrim.name}</strong> — <span className="mono">{pilgrim.passportNumber}</span>
-        </dd>
-        <dt>الرحلة</dt>
-        <dd>{tripName}</dd>
-      </dl>
-      <div className="alert warning">
-        سيتم إخراج المعتمر من عدد المعتمرين النشطين في هذه الرحلة ومن المطلوب من المندوب. بياناته
-        ومستنداته وسجل نقله تبقى محفوظة، ويظهر في قائمة «المستبعدون».
-      </div>
-      <Field label="سبب الاستبعاد" required hint="3 أحرف على الأقل" error={fieldErrors.reason}>
-        <textarea className="textarea" value={reason} onChange={(event) => setReason(event.target.value)} />
-      </Field>
-    </Modal>
-  );
-};
+import { CancelPilgrimModal, TransferModal } from '../../components/PilgrimModals';
 
 /**
  * Main operational workspace: the pilgrims of ONE delegate in ONE trip.
@@ -409,7 +331,7 @@ export const DelegateTripPilgrimsPage = () => {
           pilgrim={{
             id: transferring.id,
             name: transferring.name,
-            trip: { id: trip.id, name: trip.name },
+            trip: { id: trip.id, name: trip.name, departureDate: trip.departureDate },
             delegate: { id: delegate.id },
           }}
           onClose={() => setTransferring(null)}

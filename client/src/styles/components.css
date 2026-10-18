@@ -1443,3 +1443,81 @@ table.data tfoot tr.total-row td {
   text-decoration: line-through;
   color: var(--text-muted);
 }
+
+/* ---------------------------------------------------------------- pilgrims */
+
+.btn.danger-text {
+  color: var(--danger);
+}
+
+.pre-wrap {
+  white-space: pre-wrap;
+}
+
+.section-block .section-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.section-block .section-heading h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.cancel-banner .kv.compact {
+  grid-template-columns: minmax(100px, 130px) 1fr;
+  gap: 4px 14px;
+  margin: 8px 0;
+  font-size: 13.5px;
+}
+
+.doc-card .doc-preview {
+  display: grid;
+  place-items: center;
+  height: 200px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.doc-card .doc-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.doc-card .doc-preview.is-file {
+  gap: 4px;
+  color: var(--text-muted);
+}
+
+.doc-card .doc-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.upload-box.doc-missing.is-required {
+  border-color: var(--danger-border);
+}
+
+@media (max-width: 640px) {
+  .upload-box {
+    flex-wrap: wrap;
+  }
+
+  .upload-box .upload-actions {
+    width: 100%;
+  }
+
+  .doc-card .doc-preview {
+    height: 160px;
+  }
+}
+
+.table-wrap.is-refreshing {
+  opacity: 0.6;
+  transition: opacity var(--dur-fast) var(--ease);
+}

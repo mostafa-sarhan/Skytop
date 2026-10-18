@@ -227,6 +227,10 @@ export const deletePilgrimDocument = async (
   if (!owner) throw AppError.notFound('المعتمر غير موجود');
   assertDocumentsEditable(owner.status);
   assertTripAllowsPilgrimEdits(owner.trip);
+  // The passport image is required for every pilgrim: it can be replaced, not removed.
+  if (type === 'PASSPORT_IMAGE') {
+    throw AppError.badRequest('صورة جواز السفر مطلوبة لملف المعتمر ولا يمكن حذفها، استخدم «استبدال» لرفع صورة أحدث');
+  }
 
   const doc = await prisma.pilgrimDocument.findUnique({
     where: { pilgrimId_type: { pilgrimId, type } },

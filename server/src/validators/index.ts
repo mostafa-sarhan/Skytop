@@ -186,7 +186,7 @@ export const createPilgrimSchema = z
     nationalId: z
       .string()
       .trim()
-      .regex(/^\d{6,20}$/, 'رقم الهوية غير صحيح')
+      .regex(/^\d{6,20}$/, 'الرقم القومي غير صحيح')
       .optional()
       .or(z.literal('').transform(() => undefined)),
     birthDate: dateOnly.optional(),
@@ -197,14 +197,18 @@ export const createPilgrimSchema = z
   })
   .strict();
 
+// Edit: optional fields can be cleared — '' or null stores null.
+const clearable = <T extends z.ZodTypeAny>(schema: T) =>
+  z.preprocess((v) => (v === '' ? null : v), schema.nullable().optional());
+
 export const updatePilgrimSchema = z
   .object({
     name: arabicName.optional(),
     passportNumber: createPilgrimSchema.shape.passportNumber.optional(),
-    nationalId: createPilgrimSchema.shape.nationalId,
-    birthDate: dateOnly.optional(),
-    job: optionalText(120, 'المهنة'),
-    notes: optionalText(1000, 'الملاحظات'),
+    nationalId: clearable(z.string().trim().regex(/^\d{6,20}$/, 'الرقم القومي غير صحيح')),
+    birthDate: clearable(dateOnly),
+    job: clearable(z.string().trim().max(120, 'المهنة طويل جداً')),
+    notes: clearable(z.string().trim().max(1000, 'الملاحظات طويل جداً')),
     delegateId: uuid.optional(),
   })
   .strict()

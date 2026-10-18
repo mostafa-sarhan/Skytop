@@ -242,6 +242,22 @@ export interface Pilgrim {
   delegate: { id: string; name: string; phone?: string; address?: string; status?: DelegateStatus };
   trip?: { id: string; name: string; departureDate?: string; returnDate?: string; status: TripStatus };
   documentStatus: DocumentStatus;
+  cancelledAt?: string | null;
+}
+
+/** GET /pilgrims row: includes the trip rules for the row actions. */
+export interface PilgrimListItem extends Pilgrim {
+  tripCapabilities: TripCapabilities;
+}
+
+export interface PilgrimList extends Paginated<PilgrimListItem> {
+  counts: Record<PilgrimStatus, number>;
+}
+
+/** GET /pilgrims/filter-options — id + name only, no page limit. */
+export interface PilgrimFilterOptions {
+  trips: Array<{ id: string; name: string; departureDate: string }>;
+  delegates: Array<{ id: string; name: string }>;
 }
 
 export interface PilgrimDocument {
@@ -251,6 +267,8 @@ export interface PilgrimDocument {
   mimeType: string;
   sizeBytes: number;
   createdAt: string;
+  updatedAt?: string;
+  uploadedBy?: { fullName: string } | null;
 }
 
 export interface PilgrimTransfer {

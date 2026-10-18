@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, api, errorMessage, postForm } from '../../api/client';
 import type { Paginated, PilgrimDetail, Trip, TripDetail } from '../../api/types';
 import { useAsync, validationMessages } from '../../lib/hooks';
@@ -77,6 +77,8 @@ export const PilgrimFormPage = () => {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
+  // From the global list: carried to the pilgrim file so «رجوع» keeps the filters.
+  const origin = useLocation().state as { from?: string } | null;
 
   const [form, setForm] = useState<FormState>({
     ...empty,
@@ -148,6 +150,9 @@ export const PilgrimFormPage = () => {
     if (!isEdit && !trip.data.capabilities.canAddPilgrims) {
       return `الرحلة ${tripStatusLabel[trip.data.status]}: ${tripStatusHint[trip.data.status]}`;
     }
+    if (isEdit && pilgrim.data?.status === 'CANCELLED') {
+      return 'هذا المعتمر مستبعد: بياناته محفوظة للعرض فقط ولا يمكن تعديلها';
+    }
     if (isEdit && !trip.data.capabilities.canEditPilgrims) return tripStatusHint[trip.data.status];
     if (inContext && !isEdit) {
       if (!ctxAssignment) return 'هذا المندوب غير مسند إلى هذه الرحلة';
@@ -170,13 +175,15 @@ export const PilgrimFormPage = () => {
     setError('');
     setFieldErrors({});
     try {
+      // Create omits empty optional fields; edit sends null so a cleared field is cleared.
+      const empty = isEdit ? null : undefined;
       const payload = {
         name: form.name.trim(),
         passportNumber: form.passportNumber.trim(),
-        nationalId: form.nationalId.trim() || undefined,
-        birthDate: form.birthDate || undefined,
-        job: form.job.trim() || undefined,
-        notes: form.notes.trim() || undefined,
+        nationalId: form.nationalId.trim() || empty,
+        birthDate: form.birthDate || empty,
+        job: form.job.trim() || empty,
+        notes: form.notes.trim() || empty,
         delegateId,
       };
       if (isEdit) {
@@ -187,6 +194,7 @@ export const PilgrimFormPage = () => {
           inContext
             ? `/delegates/${delegateId}/trips/${form.tripId}/pilgrims/${id}`
             : `/pilgrims/${id}`,
+          { state: origin },
         );
       } else {
         // One multipart request: the pilgrim and its documents are created together.
@@ -229,16 +237,19 @@ export const PilgrimFormPage = () => {
 
   return (
     <div className="page">
-      {workspace ? (
-        <Breadcrumbs
-          items={[
-            { label: 'المناديب', to: '/delegates' },
-            { label: ctxDelegateName ?? 'المندوب', to: `/delegates/${ctxDelegateId}` },
-            { label: ctxTripName ?? 'الرحلة', to: workspace },
-            { label: isEdit ? 'تعديل معتمر' : 'إضافة معتمر' },
-          ]}
-        />
-      ) : null}
+      <Breadcrumbs
+        items={[
+          ...(workspace
+            ? [
+                { label: 'المناديب', to: '/delegates' },
+                { label: ctxDelegateName ?? 'المندوب', to: `/delegates/${ctxDelegateId}` },
+                { label: ctxTripName ?? 'الرحلة', to: workspace },
+              ]
+            : [{ label: 'المعتمرون', to: origin?.from ?? '/pilgrims' }]),
+          ...(isEdit ? [{ label: p?.name ?? 'المعتمر', to: cancelPath }] : []),
+          { label: isEdit ? 'تعديل البيانات' : 'إضافة معتمر' },
+        ]}
+      />
       <PageHeader
         title={isEdit ? 'تعديل بيانات معتمر' : 'إضافة معتمر جديد'}
         subtitle={
@@ -249,7 +260,7 @@ export const PilgrimFormPage = () => {
               : 'اختر الرحلة ثم المندوب المسند إليها'
         }
         actions={
-          <Link className="btn secondary" to={cancelPath}>
+          <Link className="btn secondary" to={cancelPath} state={origin}>
             إلغاء
           </Link>
         }
@@ -302,7 +313,7 @@ export const PilgrimFormPage = () => {
                         placeholder="A1234567"
                       />
                     </Field>
-                    <Field label="رقم الهوية / الرقم القومي" error={fieldErrors.nationalId}>
+                    <Field label="الرقم القومي" error={fieldErrors.nationalId}>
                       <TextInput
                         value={form.nationalId}
                         onChange={set('nationalId')}
@@ -404,7 +415,10 @@ export const PilgrimFormPage = () => {
                   </div>
                   {isEdit ? (
                     <p className="muted small" style={{ margin: 0 }}>
-                      تُدار المستندات من ملف المعتمر: يمكن استبدال صورة الجواز أو إضافة الصورة الشخصية هناك.
+                      تُدار المستندات من ملف المعتمر (استبدال صورة الجواز أو رفع الصورة الشخصية) —{' '}
+                      <Link to={`${cancelPath}#documents`} state={origin}>
+                        فتح المستندات
+                      </Link>
                     </p>
                   ) : (
                     <div className="form-grid">
@@ -457,7 +471,7 @@ export const PilgrimFormPage = () => {
               <button type="submit" className="btn" disabled={!canSubmit}>
                 {submitting ? 'جارٍ الحفظ...' : isEdit ? 'حفظ التعديلات' : 'إضافة المعتمر'}
               </button>
-              <Link className="btn secondary" to={cancelPath}>
+              <Link className="btn secondary" to={cancelPath} state={origin}>
                 رجوع
               </Link>
               {!isEdit && !passportImage ? (

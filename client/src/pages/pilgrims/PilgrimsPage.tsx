@@ -1,8 +1,9 @@
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import type { Delegate, Paginated, Pilgrim, Trip } from '../../api/types';
-import { useAsync, useListState } from '../../lib/hooks';
-import { documentStatusLabel, formatDate } from '../../lib/format';
+import type { PilgrimFilterOptions, PilgrimList, PilgrimStatus } from '../../api/types';
+import { useAsync } from '../../lib/hooks';
+import { documentStatusLabel, formatCount, formatDate } from '../../lib/format';
 import {
   Badge,
   EmptyState,
@@ -12,56 +13,80 @@ import {
   PageHeader,
   Pagination,
   SelectInput,
+  Tabs,
   TextInput,
+  useDebouncedValue,
 } from '../../ui/primitives';
+import type { PilgrimListOrigin } from './PilgrimDetailPage';
 
+const PAGE_SIZE = 20;
+const FILTER_KEYS = ['q', 'tripId', 'delegateId', 'documentStatus'] as const;
+
+/**
+ * Global pilgrim search. Every filter, the status tab and the page live in the
+ * URL, so «رجوع» from a pilgrim file returns to the same view. Active pilgrims
+ * by default; no financial data.
+ */
 export const PilgrimsPage = () => {
-  const list = useListState();
-  const navigate = useNavigate();
+  const location = useLocation();
   const [params, setParams] = useSearchParams();
-
+  const status = (params.get('status') as PilgrimStatus | null) ?? 'ACTIVE';
   const tripId = params.get('tripId') ?? '';
   const delegateId = params.get('delegateId') ?? '';
   const documentStatus = params.get('documentStatus') ?? 'ALL';
+  const page = Number(params.get('page') ?? '1') || 1;
+  const q = params.get('q') ?? '';
 
-  const setFilter = (key: string, value: string) => {
+  const update = (changes: Record<string, string>, keepPage = false) => {
     const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value && !(key === 'status' && value === 'ACTIVE') && !(key === 'documentStatus' && value === 'ALL')) {
+        next.set(key, value);
+      } else next.delete(key);
+    }
+    if (!keepPage) next.delete('page');
     setParams(next, { replace: true });
   };
 
-  const trips = useAsync<Paginated<Trip>>(
-    (signal) => api.get<Paginated<Trip>>('/trips', { pageSize: 200 }, signal),
-    [],
-  );
-  const delegates = useAsync<Paginated<Delegate>>(
-    (signal) => api.get<Paginated<Delegate>>('/delegates', { pageSize: 200 }, signal),
+  // Typing is local; the URL (and the request) follow the debounced value.
+  const [search, setSearch] = useState(q);
+  const debounced = useDebouncedValue(search.trim());
+  useEffect(() => {
+    if (debounced !== q) update({ q: debounced });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debounced]);
+
+  const options = useAsync<PilgrimFilterOptions>(
+    (signal) => api.get<PilgrimFilterOptions>('/pilgrims/filter-options', undefined, signal),
     [],
   );
 
-  const { data, loading, error, reload } = useAsync<Paginated<Pilgrim>>(
+  const { data, loading, error, reload } = useAsync<PilgrimList>(
     (signal) =>
-      api.get<Paginated<Pilgrim>>(
+      api.get<PilgrimList>(
         '/pilgrims',
         {
-          page: list.page,
-          pageSize: list.pageSize,
-          search: list.debouncedSearch || undefined,
+          page,
+          pageSize: PAGE_SIZE,
+          status,
+          search: q || undefined,
           tripId: tripId || undefined,
           delegateId: delegateId || undefined,
           documentStatus,
         },
         signal,
       ),
-    [list.page, list.pageSize, list.debouncedSearch, tripId, delegateId, documentStatus],
+    [page, status, q, tripId, delegateId, documentStatus],
   );
+
+  const filtered = FILTER_KEYS.some((key) => params.get(key));
+  const origin: PilgrimListOrigin = { from: `${location.pathname}${location.search}` };
 
   return (
     <div className="page">
       <PageHeader
         title="المعتمرون"
-        subtitle="إدارة ملفات المعتمرين ووثائقهم"
+        subtitle="بحث عن أي معتمر في كل الرحلات والمناديب"
         actions={
           <Link className="btn" to="/pilgrims/new">
             <Icon name="plus" size={15} /> إضافة معتمر
@@ -75,125 +100,181 @@ export const PilgrimsPage = () => {
             <Field label="بحث">
               <TextInput
                 className="input-search"
-                value={list.search}
-                onChange={(event) => list.setSearch(event.target.value)}
-                placeholder="الاسم أو رقم الجواز أو الهوية"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="الاسم أو رقم الجواز أو الرقم القومي"
               />
             </Field>
             <Field label="الرحلة">
-              <SelectInput value={tripId} onChange={(event) => setFilter('tripId', event.target.value)}>
+              <SelectInput value={tripId} onChange={(event) => update({ tripId: event.target.value })}>
                 <option value="">كل الرحلات</option>
-                {(trips.data?.items ?? []).map((trip) => (
+                {(options.data?.trips ?? []).map((trip) => (
                   <option key={trip.id} value={trip.id}>
-                    {trip.name}
+                    {trip.name} — {formatDate(trip.departureDate)}
                   </option>
                 ))}
               </SelectInput>
             </Field>
             <Field label="المندوب">
-              <SelectInput
-                value={delegateId}
-                onChange={(event) => setFilter('delegateId', event.target.value)}
-              >
-                <option value="">كل المندوبين</option>
-                {(delegates.data?.items ?? []).map((delegate) => (
+              <SelectInput value={delegateId} onChange={(event) => update({ delegateId: event.target.value })}>
+                <option value="">كل المناديب</option>
+                {(options.data?.delegates ?? []).map((delegate) => (
                   <option key={delegate.id} value={delegate.id}>
                     {delegate.name}
                   </option>
                 ))}
               </SelectInput>
             </Field>
-            <Field label="حالة الوثائق">
+            <Field label="حالة المستندات">
               <SelectInput
                 value={documentStatus}
-                onChange={(event) => setFilter('documentStatus', event.target.value)}
+                onChange={(event) => update({ documentStatus: event.target.value })}
               >
                 <option value="ALL">الكل</option>
-                <option value="COMPLETE">مكتملة</option>
-                <option value="INCOMPLETE">ناقصة</option>
+                <option value="COMPLETE">مكتمل</option>
+                <option value="INCOMPLETE">ناقص</option>
               </SelectInput>
             </Field>
-            <button type="button" className="btn secondary" onClick={reload}>
-              <Icon name="refresh" size={15} /> تحديث
-            </button>
+            {filtered ? (
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setSearch('');
+                  update({ q: '', tripId: '', delegateId: '', documentStatus: '' });
+                }}
+              >
+                مسح التصفية
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
 
+      <div className="filter-tabs">
+        <Tabs
+          items={[
+            { id: 'ACTIVE', label: 'النشطون', count: data?.counts.ACTIVE },
+            { id: 'CANCELLED', label: 'المستبعدون', count: data?.counts.CANCELLED },
+          ]}
+          active={status}
+          onChange={(id) => update({ status: id })}
+        />
+      </div>
+
       <div className="card">
-        {loading ? <LoadingBlock /> : null}
-        {error ? <EmptyState title="تعذر تحميل قائمة المعتمرين" /> : null}
-        {data ? (
+        {loading && !data ? <LoadingBlock /> : null}
+        {error ? (
+          <EmptyState
+            icon="alert"
+            title="تعذر تحميل قائمة المعتمرين"
+            action={
+              <button type="button" className="btn secondary" onClick={reload}>
+                إعادة المحاولة
+              </button>
+            }
+          />
+        ) : null}
+        {data && !error ? (
           data.items.length === 0 ? (
             <EmptyState
-              title="لا يوجد معتمرون"
-              description="أضف معتمراً جديداً أو عدّل عوامل التصفية"
+              icon="pilgrim"
+              title={
+                filtered
+                  ? 'لا توجد نتائج مطابقة'
+                  : status === 'CANCELLED'
+                    ? 'لا يوجد معتمرون مستبعدون'
+                    : 'لا يوجد معتمرون بعد'
+              }
+              description={filtered ? 'جرّب تغيير البحث أو التصفية' : undefined}
               action={
-                <Link className="btn" to="/pilgrims/new">
-                  إضافة معتمر
-                </Link>
+                !filtered && status === 'ACTIVE' ? (
+                  <Link className="btn" to="/pilgrims/new">
+                    إضافة معتمر
+                  </Link>
+                ) : undefined
               }
             />
           ) : (
             <>
-              <div className="table-wrap">
+              <div className={`table-wrap${loading ? ' is-refreshing' : ''}`}>
                 <table className="data">
                   <thead>
                     <tr>
-                      <th>الاسم</th>
-                      <th>جواز السفر</th>
-                      <th>الهوية</th>
-                      <th>الرحلة</th>
+                      <th>اسم المعتمر</th>
+                      <th>رقم جواز السفر</th>
+                      <th>الرقم القومي</th>
                       <th>المندوب</th>
-                      <th>الوثائق</th>
+                      <th>الرحلة</th>
+                      <th>حالة المستندات</th>
+                      <th>الحالة</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.items.map((pilgrim) => (
-                      <tr key={pilgrim.id}>
-                        <td>
-                          <Link to={`/pilgrims/${pilgrim.id}`}>
-                            <strong>{pilgrim.name}</strong>
-                          </Link>
-                        </td>
-                        <td className="mono">{pilgrim.passportNumber}</td>
-                        <td className="mono">{pilgrim.nationalId ?? '—'}</td>
-                        <td>{pilgrim.trip?.name ?? '—'}</td>
-                        <td>{pilgrim.delegate.name}</td>
-                        <td>
-                          <Badge tone={pilgrim.documentStatus === 'COMPLETE' ? 'success' : 'warning'}>
-                            {documentStatusLabel[pilgrim.documentStatus]}
-                          </Badge>
-                        </td>
-                        <td>
-                          <div className="row">
-                            <button
-                              type="button"
-                              className="btn ghost sm"
-                              onClick={() => navigate(`/pilgrims/${pilgrim.id}`)}
-                            >
-                              <Icon name="eye" size={14} /> الملف
-                            </button>
-                            <Link className="btn ghost sm" to={`/pilgrims/${pilgrim.id}/edit`}>
-                              <Icon name="edit" size={14} /> تعديل
+                    {data.items.map((pilgrim) => {
+                      const cancelled = pilgrim.status === 'CANCELLED';
+                      const canEdit = !cancelled && pilgrim.tripCapabilities.canEditPilgrims;
+                      return (
+                        <tr key={pilgrim.id} className={cancelled ? 'row-voided' : undefined}>
+                          <td>
+                            <Link to={`/pilgrims/${pilgrim.id}`} state={origin}>
+                              <strong>{pilgrim.name}</strong>
                             </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="mono">{pilgrim.passportNumber}</td>
+                          <td className="mono">{pilgrim.nationalId || '—'}</td>
+                          <td>{pilgrim.delegate.name}</td>
+                          <td>
+                            {pilgrim.trip?.name ?? '—'}
+                            {pilgrim.trip?.departureDate ? (
+                              <div className="muted small mono">{formatDate(pilgrim.trip.departureDate)}</div>
+                            ) : null}
+                          </td>
+                          <td>
+                            <Badge tone={pilgrim.documentStatus === 'COMPLETE' ? 'success' : 'warning'}>
+                              {documentStatusLabel[pilgrim.documentStatus]}
+                            </Badge>
+                          </td>
+                          <td>
+                            {cancelled ? (
+                              <>
+                                <Badge tone="danger">مستبعد</Badge>
+                                {pilgrim.cancelledAt ? (
+                                  <div className="muted small mono">{formatDate(pilgrim.cancelledAt)}</div>
+                                ) : null}
+                              </>
+                            ) : (
+                              <Badge tone="success">نشط</Badge>
+                            )}
+                          </td>
+                          <td>
+                            <div className="row nowrap">
+                              <Link className="btn ghost sm" to={`/pilgrims/${pilgrim.id}`} state={origin}>
+                                <Icon name="eye" size={14} /> الملف
+                              </Link>
+                              {canEdit ? (
+                                <Link className="btn ghost sm" to={`/pilgrims/${pilgrim.id}/edit`} state={origin}>
+                                  <Icon name="edit" size={14} /> تعديل
+                                </Link>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-              <Pagination {...data.meta} onPage={list.setPage} />
+              <Pagination {...data.meta} onPage={(next) => update({ page: String(next) }, true)} />
             </>
           )
         ) : null}
       </div>
-
-      {data && data.items.length > 0 ? (
+      {data ? (
         <p className="muted small" style={{ marginTop: 10 }}>
-          آخر تسجيل: {formatDate(data.items[0].createdAt)}
+          {formatCount(data.meta.total)} معتمر {status === 'CANCELLED' ? 'مستبعد' : 'نشط'}
+          {filtered ? ' مطابق للتصفية' : ''}
         </p>
       ) : null}
     </div>

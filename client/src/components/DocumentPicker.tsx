@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatFileSize } from '../lib/format';
 import { Icon } from '../ui/primitives';
-
-/** Same types and limit the API accepts for pilgrim documents. */
-const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-const MAX_BYTES = 8 * 1024 * 1024;
+import { ACCEPTED_DOCUMENT_TYPES, documentFileError } from '../lib/documents';
 
 /**
  * Selects one document before saving: shows the file name, size and a
@@ -42,12 +39,9 @@ export const DocumentPicker = ({
   const pick = (selected: File | undefined) => {
     if (inputRef.current) inputRef.current.value = '';
     if (!selected) return;
-    if (!ACCEPTED.includes(selected.type)) {
-      setLocalError('نوع الملف غير مدعوم، المسموح: JPG, PNG, WEBP, PDF');
-      return;
-    }
-    if (selected.size > MAX_BYTES) {
-      setLocalError('حجم الملف يتجاوز الحد المسموح (8 ميجابايت)');
+    const problem = documentFileError(selected);
+    if (problem) {
+      setLocalError(problem);
       return;
     }
     setLocalError('');
@@ -110,7 +104,7 @@ export const DocumentPicker = ({
           ref={inputRef}
           type="file"
           name={name}
-          accept={ACCEPTED.join(',')}
+          accept={ACCEPTED_DOCUMENT_TYPES.join(',')}
           hidden
           onChange={(event) => pick(event.target.files?.[0])}
         />

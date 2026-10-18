@@ -153,7 +153,7 @@ export const documentStatusLabel: Record<DocumentStatus, string> = {
   COMPLETE: 'مكتمل',
   MISSING_PASSPORT: 'صورة جواز السفر ناقصة',
   MISSING_PHOTO: 'الصورة الشخصية ناقصة',
-  MISSING_BOTH: 'صورة الجواز والصورة الشخصية ناقصتان',
+  MISSING_BOTH: 'المستندان ناقصان',
 };
 
 export const auditActionLabel: Record<string, string> = {

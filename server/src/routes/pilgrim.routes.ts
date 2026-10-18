@@ -22,6 +22,7 @@ const runUpload = runMulter(uploadSingle);
 const router = Router();
 
 router.get('/', validateQuery(pilgrimListQuery), asyncHandler(pilgrimController.list));
+router.get('/filter-options', asyncHandler(pilgrimController.filterOptions));
 router.get('/:id', validateParams(uuidParam), asyncHandler(pilgrimController.getById));
 // multipart/form-data: pilgrim fields + `passportImage` (required) +
 // `personalPhoto` (optional). Created atomically with its documents.

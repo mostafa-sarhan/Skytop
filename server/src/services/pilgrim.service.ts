@@ -77,24 +77,34 @@ export const listPilgrims = async (query: PilgrimListQuery) => {
         }
       : baseWhere;
 
-  const [rows, total] = await Promise.all([
+  // Same filters without the status, for the نشطون / مستبعدون tab counts.
+  const { status: _status, ...withoutStatus } = where;
+
+  const [rows, total, statusCounts] = await Promise.all([
     prisma.pilgrim.findMany({
       where,
       include,
-      orderBy: { createdAt: 'desc' },
+      orderBy: query.status === 'CANCELLED' ? [{ cancelledAt: 'desc' }] : [{ createdAt: 'desc' }],
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     }),
     prisma.pilgrim.count({ where }),
+    prisma.pilgrim.groupBy({ by: ['status'], where: withoutStatus, _count: { _all: true } }),
   ]);
+  const countOf = (s: 'ACTIVE' | 'CANCELLED') => statusCounts.find((c) => c.status === s)?._count._all ?? 0;
 
   const items = rows.map(({ documents, ...pilgrim }) => ({
     ...pilgrim,
     birthDate: pilgrim.birthDate ? pilgrim.birthDate.toISOString() : null,
+    cancelledAt: pilgrim.cancelledAt ? pilgrim.cancelledAt.toISOString() : null,
     documentStatus: computeDocumentStatus(documents.map((d) => d.type)),
+    tripCapabilities: tripCapabilities(pilgrim.trip.status),
   }));
 
-  return buildPage(items, total, query.page, query.pageSize);
+  return {
+    ...buildPage(items, total, query.page, query.pageSize),
+    counts: { ACTIVE: countOf('ACTIVE'), CANCELLED: countOf('CANCELLED') },
+  };
 };
 
 export const getPilgrimById = async (pilgrimId: string) => {
@@ -104,7 +114,10 @@ export const getPilgrimById = async (pilgrimId: string) => {
       delegate: { select: { id: true, name: true, phone: true, address: true, status: true } },
       trip: { select: { id: true, name: true, departureDate: true, returnDate: true, status: true } },
       cancelledBy: { select: { id: true, fullName: true } },
-      documents: { orderBy: { createdAt: 'asc' } },
+      documents: {
+        orderBy: { createdAt: 'asc' },
+        include: { uploadedBy: { select: { fullName: true } } },
+      },
       transfers: {
         include: {
           fromTrip: { select: { id: true, name: true } },
@@ -131,8 +144,29 @@ export const getPilgrimById = async (pilgrimId: string) => {
       mimeType: d.mimeType,
       sizeBytes: d.sizeBytes,
       createdAt: d.createdAt,
+      // Latest upload (a replace keeps the row and moves updatedAt).
+      updatedAt: d.updatedAt,
+      uploadedBy: { fullName: d.uploadedBy.fullName },
     })),
     transfers: transfers.map((t) => ({ ...t, createdAt: t.createdAt.toISOString() })),
+  };
+};
+
+/**
+ * Trip and delegate choices for the pilgrims list filters: id + name only, no
+ * page limit (newest departure first).
+ */
+export const pilgrimFilterOptions = async () => {
+  const [trips, delegates] = await Promise.all([
+    prisma.trip.findMany({
+      select: { id: true, name: true, departureDate: true },
+      orderBy: [{ departureDate: 'desc' }, { name: 'asc' }],
+    }),
+    prisma.delegate.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+  ]);
+  return {
+    trips: trips.map((t) => ({ id: t.id, name: t.name, departureDate: t.departureDate.toISOString() })),
+    delegates,
   };
 };
 
@@ -174,6 +208,14 @@ const assertDelegateAssignedToTrip = async (delegateId: string, tripId: string) 
     );
   }
   return assignment;
+};
+
+/** Edit: optional fields may be null to clear them. */
+type UpdatePilgrimInput = Partial<Omit<CreatePilgrimInput, 'nationalId' | 'birthDate' | 'job' | 'notes'>> & {
+  nationalId?: string | null;
+  birthDate?: Date | null;
+  job?: string | null;
+  notes?: string | null;
 };
 
 export interface CreatePilgrimFiles {
@@ -259,7 +301,7 @@ export const createPilgrim = async (actorId: string, input: CreatePilgrimInput, 
 export const updatePilgrim = async (
   actorId: string,
   pilgrimId: string,
-  input: Partial<CreatePilgrimInput>,
+  input: UpdatePilgrimInput,
 ) => {
   const current = await prisma.pilgrim.findUnique({
     where: { id: pilgrimId },
