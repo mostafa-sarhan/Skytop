@@ -255,7 +255,7 @@ export const DelegateTripPilgrimsPage = () => {
           </div>
         ) : !loading ? (
           <div className="table-wrap">
-            <table className="data">
+            <table className="data dense">
               <thead>
                 <tr>
                   <th className="num">م</th>
@@ -272,7 +272,7 @@ export const DelegateTripPilgrimsPage = () => {
                 {rows.map((pilgrim, index) => (
                   <tr key={pilgrim.id}>
                     <td className="num mono">{index + 1}</td>
-                    <td>
+                    <td className="name-cell">
                       <Link to={`${base}/${pilgrim.id}`}>
                         <strong>{pilgrim.name}</strong>
                       </Link>
@@ -287,38 +287,45 @@ export const DelegateTripPilgrimsPage = () => {
                       </Badge>
                     </td>
                     <td>
-                      <div className="row">
-                        <Link className="btn ghost sm" to={`${base}/${pilgrim.id}`}>
-                          <Icon name="eye" size={14} /> عرض
+                      {/* Compact icon actions (Arabic tooltips + labels) on one line. */}
+                      <div className="row nowrap row-actions">
+                        <Link className="btn ghost sm icon-only" to={`${base}/${pilgrim.id}`} title="ملف المعتمر" aria-label="ملف المعتمر">
+                          <Icon name="eye" size={15} />
                         </Link>
                         {canEdit ? (
-                          <Link className="btn ghost sm" to={`${base}/${pilgrim.id}/edit`}>
-                            <Icon name="edit" size={14} /> تعديل
+                          <Link className="btn ghost sm icon-only" to={`${base}/${pilgrim.id}/edit`} title="تعديل البيانات" aria-label="تعديل البيانات">
+                            <Icon name="edit" size={15} />
                           </Link>
                         ) : null}
                         <button
                           type="button"
-                          className="btn ghost sm"
+                          className="btn ghost sm icon-only"
+                          title="المستندات"
+                          aria-label="المستندات"
                           onClick={() => navigate(`${base}/${pilgrim.id}#documents`)}
                         >
-                          <Icon name="file" size={14} /> المستندات
+                          <Icon name="file" size={15} />
                         </button>
                         {canTransfer ? (
                           <button
                             type="button"
-                            className="btn ghost sm"
+                            className="btn ghost sm icon-only"
+                            title="نقل إلى رحلة أخرى"
+                            aria-label="نقل إلى رحلة أخرى"
                             onClick={() => setTransferring(pilgrim)}
                           >
-                            <Icon name="refresh" size={14} /> نقل
+                            <Icon name="refresh" size={15} />
                           </button>
                         ) : null}
                         {canCancel ? (
                           <button
                             type="button"
-                            className="btn ghost sm"
+                            className="btn ghost sm icon-only danger-text"
+                            title="استبعاد"
+                            aria-label="استبعاد"
                             onClick={() => setCancelling(pilgrim)}
                           >
-                            <Icon name="trash" size={14} /> استبعاد
+                            <Icon name="trash" size={15} />
                           </button>
                         ) : null}
                       </div>

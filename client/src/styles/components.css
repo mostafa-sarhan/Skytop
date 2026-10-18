@@ -1613,3 +1613,33 @@ tr.group-row td {
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+
+/* Compact row actions (long operational tables) */
+.row-actions {
+  gap: 4px;
+}
+
+.btn.sm.icon-only {
+  padding: 5px 8px;
+  min-width: 32px;
+  justify-content: center;
+}
+
+/* Dense variant for long operational tables (pilgrim lists). */
+table.data.dense th,
+table.data.dense td {
+  padding: 10px 10px;
+}
+
+/* Long status badges may take two short lines instead of widening the table. */
+table.data.dense td .badge {
+  white-space: normal;
+  line-height: 1.35;
+  max-width: 152px;
+}
+
+table.data td.name-cell {
+  white-space: normal;
+  min-width: 128px;
+  max-width: 220px;
+}

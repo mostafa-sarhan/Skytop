@@ -198,7 +198,7 @@ export const PilgrimsPage = () => {
           ) : (
             <>
               <div className={`table-wrap${loading ? ' is-refreshing' : ''}`}>
-                <table className="data">
+                <table className="data dense">
                   <thead>
                     <tr>
                       <th>اسم المعتمر</th>
@@ -217,15 +217,15 @@ export const PilgrimsPage = () => {
                       const canEdit = !cancelled && pilgrim.tripCapabilities.canEditPilgrims;
                       return (
                         <tr key={pilgrim.id} className={cancelled ? 'row-voided' : undefined}>
-                          <td>
+                          <td className="name-cell">
                             <Link to={`/pilgrims/${pilgrim.id}`} state={origin}>
                               <strong>{pilgrim.name}</strong>
                             </Link>
                           </td>
                           <td className="mono">{pilgrim.passportNumber}</td>
                           <td className="mono">{pilgrim.nationalId || '—'}</td>
-                          <td>{pilgrim.delegate.name}</td>
-                          <td>
+                          <td className="name-cell">{pilgrim.delegate.name}</td>
+                          <td className="name-cell">
                             {pilgrim.trip?.name ?? '—'}
                             {pilgrim.trip?.departureDate ? (
                               <div className="muted small mono">{formatDate(pilgrim.trip.departureDate)}</div>
@@ -250,12 +250,12 @@ export const PilgrimsPage = () => {
                           </td>
                           <td>
                             <div className="row nowrap">
-                              <Link className="btn ghost sm" to={`/pilgrims/${pilgrim.id}`} state={origin}>
-                                <Icon name="eye" size={14} /> الملف
+                              <Link className="btn ghost sm icon-only" to={`/pilgrims/${pilgrim.id}`} state={origin} title="ملف المعتمر" aria-label="ملف المعتمر">
+                                <Icon name="eye" size={15} />
                               </Link>
                               {canEdit ? (
-                                <Link className="btn ghost sm" to={`/pilgrims/${pilgrim.id}/edit`} state={origin}>
-                                  <Icon name="edit" size={14} /> تعديل
+                                <Link className="btn ghost sm icon-only" to={`/pilgrims/${pilgrim.id}/edit`} state={origin} title="تعديل البيانات" aria-label="تعديل البيانات">
+                                  <Icon name="edit" size={15} />
                                 </Link>
                               ) : null}
                             </div>
