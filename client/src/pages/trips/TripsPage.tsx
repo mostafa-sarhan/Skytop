@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, errorMessage } from '../../api/client';
 import type { FlightType, Paginated, Trip, TripStatus } from '../../api/types';
 import { useAsync, useListState, validationMessages } from '../../lib/hooks';
@@ -145,7 +145,13 @@ export const TripsPage = () => {
   const list = useListState();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'' | TripStatus>('');
-  const [modalOpen, setModalOpen] = useState(false);
+  // `?new=1` (dashboard quick action) opens the create form directly.
+  const [params, setParams] = useSearchParams();
+  const [modalOpen, setModalOpenState] = useState(() => params.get('new') === '1');
+  const setModalOpen = (open: boolean) => {
+    setModalOpenState(open);
+    if (!open && params.has('new')) setParams({}, { replace: true });
+  };
   const debouncedStatus = useDebouncedValue(status);
 
   const { data, loading, error, reload } = useAsync<Paginated<Trip>>(

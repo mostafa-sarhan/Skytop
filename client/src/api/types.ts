@@ -337,16 +337,37 @@ export interface FinancialAdjustment {
   } | null;
 }
 
+/** GET /dashboard/stats — role-aware; `finance` is null for employees. */
 export interface DashboardStats {
-  totalTrips: number;
-  openTrips: number;
-  totalPilgrims: number;
-  totalDelegates: number;
-  activeDelegates: number;
-  totalCollected: string;
-  paymentCount: number;
-  incompleteDocuments: number;
-  totalOutstanding: string;
+  trips: { upcoming: number; ongoing: number };
+  pilgrims: { active: number; cancelled: number };
+  delegates: { active: number; total: number };
+  documents: {
+    incomplete: number;
+    topTrips: Array<{ tripId: string; tripName: string; departureDate: string; phase: TripPhase; incomplete: number }>;
+  };
+  upcomingTrips: Array<{
+    id: string;
+    name: string;
+    status: TripStatus;
+    departureDate: string;
+    returnDate: string;
+    phase: TripPhase;
+    delegateCount: number;
+    activePilgrimCount: number;
+    incompleteDocuments: number;
+  }>;
+  payments: { todayCount: number; recent: PaymentRow[] };
+  finance: {
+    totalRequired: string;
+    totalPaid: string;
+    totalRemaining: string;
+    totalCredit: string;
+    dueDelegates: number;
+    creditDelegates: number;
+    paymentCount: number;
+    todayAmount: string;
+  } | null;
 }
 
 export interface AuditLog {

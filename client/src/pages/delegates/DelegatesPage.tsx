@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, errorMessage } from '../../api/client';
 import type { Delegate, DelegateStatus, Paginated } from '../../api/types';
 import { useAsync, useListState, validationMessages } from '../../lib/hooks';
@@ -118,7 +118,13 @@ export const DelegatesPage = () => {
   const toast = useToast();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'' | DelegateStatus>('');
-  const [modalOpen, setModalOpen] = useState(false);
+  // `?new=1` (dashboard quick action) opens the create form directly.
+  const [params, setParams] = useSearchParams();
+  const [modalOpen, setModalOpenState] = useState(() => params.get('new') === '1');
+  const setModalOpen = (open: boolean) => {
+    setModalOpenState(open);
+    if (!open && params.has('new')) setParams({}, { replace: true });
+  };
   const debouncedStatus = useDebouncedValue(status);
 
   const { data, loading, error, reload } = useAsync<Paginated<Delegate>>(

@@ -4,7 +4,7 @@ import { dateRangeFilter } from '../utils/dateRange';
 import { AppError } from '../utils/AppError';
 import { decimalToJson } from '../utils/money';
 import { computeDocumentStatus } from './pilgrim.service';
-import { getDelegateAccount, getDelegateAccounts } from './delegateAccount.service';
+import { getDelegateAccount } from './delegateAccount.service';
 
 export interface ReportMeta {
   title: string;
@@ -199,58 +199,5 @@ export const paymentHistoryReport = async (filters: {
     } satisfies ReportMeta,
     rows,
     summary: { count: rows.length, totalActive: decimalToJson(totalActive)! },
-  };
-};
-
-export const dashboardStats = async () => {
-  const [
-    totalTrips,
-    openTrips,
-    totalPilgrims,
-    totalDelegates,
-    activeDelegates,
-    paymentsAgg,
-    incompleteDocs,
-  ] = await Promise.all([
-    prisma.trip.count(),
-    prisma.trip.count({ where: { status: 'OPEN' } }),
-    prisma.pilgrim.count({ where: { status: 'ACTIVE' } }),
-    prisma.delegate.count(),
-    prisma.delegate.count({ where: { status: 'ACTIVE' } }),
-    prisma.payment.aggregate({
-      where: { status: 'ACTIVE' },
-      _sum: { amount: true },
-      _count: true,
-    }),
-    prisma.pilgrim
-      .count({
-        where: {
-          status: 'ACTIVE',
-          OR: [
-            { documents: { none: { type: 'PASSPORT_IMAGE' } } },
-            { documents: { none: { type: 'PERSONAL_PHOTO' } } },
-          ],
-        },
-      })
-      .catch(() => 0),
-  ]);
-
-  const delegates = await prisma.delegate.findMany({ select: { id: true } });
-  const accounts = await getDelegateAccounts(delegates.map((d) => d.id));
-  const totalOutstanding = [...accounts.values()].reduce(
-    (acc, a) => acc.plus(a.remaining),
-    Prisma.Decimal(0),
-  );
-
-  return {
-    totalTrips,
-    openTrips,
-    totalPilgrims,
-    totalDelegates,
-    activeDelegates,
-    totalCollected: decimalToJson(paymentsAgg._sum.amount ?? Prisma.Decimal(0))!,
-    paymentCount: paymentsAgg._count,
-    incompleteDocuments: incompleteDocs,
-    totalOutstanding: decimalToJson(totalOutstanding)!,
   };
 };

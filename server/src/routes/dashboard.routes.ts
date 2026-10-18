@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler';
-import * as reportController from '../controllers/report.controller';
+import * as dashboardController from '../controllers/dashboard.controller';
 
 const router = Router();
 
-router.get('/stats', asyncHandler(reportController.dashboardStats));
+router.get('/stats', asyncHandler(dashboardController.overview));
 
 export default router;

@@ -428,7 +428,3 @@ export const paymentsPdf = async (req: Request, res: Response): Promise<void> =>
   });
   sendPdf(res, buffer, 'payments.pdf');
 };
-
-export const dashboardStats = async (_req: Request, res: Response): Promise<void> => {
-  ok(res, await reportService.dashboardStats());
-};

@@ -18,7 +18,7 @@ export interface DelegateListQuery {
  * A trip is active/upcoming while it has not finished: it is not COMPLETED
  * and its return date is today or later. Shared by every operational view.
  */
-const startOfTodayUtc = (): Date => {
+export const startOfTodayUtc = (): Date => {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 };
