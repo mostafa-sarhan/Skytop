@@ -129,6 +129,7 @@ export interface DelegateTripPilgrim {
   nationalId: string | null;
   birthDate: string | null;
   job: string | null;
+  address: string | null;
   notes: string | null;
   status: PilgrimStatus;
   createdAt: string;
@@ -235,6 +236,7 @@ export interface Pilgrim {
   nationalId: string | null;
   birthDate: string | null;
   job: string | null;
+  address?: string | null;
   notes: string | null;
   status?: PilgrimStatus;
   createdAt: string;
@@ -408,9 +410,11 @@ export interface ReportMeta {
 export interface MissingDocumentsReport {
   meta: ReportMeta;
   rows: Array<{
+    index: number;
     name: string;
     passportNumber: string;
     tripName: string;
+    tripDepartureDate: string;
     delegateName: string;
     documentStatus: DocumentStatus;
     hasPassportImage: boolean;
@@ -424,36 +428,40 @@ export interface MissingDocumentsReport {
   };
 }
 
-export interface TripPilgrimsReport {
-  meta: ReportMeta;
-  trip: { id: string; name: string; departureDate: string; returnDate: string };
-  rows: Array<{
-    index: number;
-    name: string;
-    passportNumber: string;
-    nationalId: string;
-    birthDate: string;
-    job: string;
-    delegateName: string;
-    documentStatus: DocumentStatus;
-  }>;
-  summary: { total: number; completeDocuments: number; incompleteDocuments: number };
+/** One line of a passenger list (كشف المعتمرين). */
+export interface PassengerRow {
+  index: number;
+  name: string;
+  job: string;
+  address: string;
+  passportNumber: string;
+  nationalId: string;
+  birthDate: string;
+  documentStatus: DocumentStatus;
 }
 
-export interface DelegatePilgrimsReport {
+interface ReportTrip {
+  id: string;
+  name: string;
+  status: TripStatus;
+  departureDate: string;
+  returnDate: string;
+}
+
+export interface TripPilgrimsReport {
   meta: ReportMeta;
+  trip: ReportTrip;
+  groups: Array<{ delegateName: string; count: number }>;
+  rows: Array<PassengerRow & { delegateId: string; delegateName: string }>;
+  summary: { total: number; completeDocuments: number; incompleteDocuments: number; delegates: number };
+}
+
+export interface DelegateTripPilgrimsReport {
+  meta: ReportMeta;
+  trip: ReportTrip;
   delegate: { id: string; name: string; phone: string };
-  rows: Array<{
-    index: number;
-    name: string;
-    passportNumber: string;
-    nationalId: string;
-    birthDate: string;
-    job: string;
-    tripName: string;
-    documentStatus: DocumentStatus;
-  }>;
-  summary: { total: number; completeDocuments: number; incompleteDocuments: number; tripsRequired: string };
+  rows: PassengerRow[];
+  summary: { total: number; completeDocuments: number; incompleteDocuments: number };
 }
 
 export interface PaymentReportRow {
@@ -472,5 +480,5 @@ export interface PaymentReportRow {
 export interface PaymentReport {
   meta: ReportMeta;
   rows: PaymentReportRow[];
-  summary: { count: number; totalActive: string };
+  summary: { count: number; activeCount: number; totalActive: string };
 }

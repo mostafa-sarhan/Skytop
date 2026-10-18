@@ -23,6 +23,7 @@ interface FormState {
   nationalId: string;
   birthDate: string;
   job: string;
+  address: string;
   notes: string;
   delegateId: string;
   tripId: string;
@@ -34,6 +35,7 @@ const empty: FormState = {
   nationalId: '',
   birthDate: '',
   job: '',
+  address: '',
   notes: '',
   delegateId: '',
   tripId: '',
@@ -110,6 +112,7 @@ export const PilgrimFormPage = () => {
       nationalId: p.nationalId ?? '',
       birthDate: p.birthDate ? p.birthDate.slice(0, 10) : '',
       job: p.job ?? '',
+      address: p.address ?? '',
       notes: p.notes ?? '',
       delegateId: p.delegate.id,
       tripId: p.trip?.id ?? '',
@@ -183,6 +186,7 @@ export const PilgrimFormPage = () => {
         nationalId: form.nationalId.trim() || empty,
         birthDate: form.birthDate || empty,
         job: form.job.trim() || empty,
+        address: form.address.trim() || empty,
         notes: form.notes.trim() || empty,
         delegateId,
       };
@@ -324,8 +328,11 @@ export const PilgrimFormPage = () => {
                     <Field label="تاريخ الميلاد" error={fieldErrors.birthDate}>
                       <TextInput type="date" value={form.birthDate} onChange={set('birthDate')} dir="ltr" />
                     </Field>
-                    <Field label="الوظيفة" error={fieldErrors.job}>
+                    <Field label="المهنة" error={fieldErrors.job}>
                       <TextInput value={form.job} onChange={set('job')} />
+                    </Field>
+                    <Field label="العنوان" error={fieldErrors.address} hint="يظهر في كشف المعتمرين">
+                      <TextInput value={form.address} onChange={set('address')} />
                     </Field>
                   </div>
                 </section>

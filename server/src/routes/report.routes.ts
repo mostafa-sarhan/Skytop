@@ -3,9 +3,9 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { validateParams, validateQuery } from '../middlewares/validate';
 import * as reportController from '../controllers/report.controller';
 import {
-  delegateReportQuery,
   missingDocumentsQuery,
   paymentHistoryQuery,
+  reportDelegateTripQuery,
   reportTripQuery,
   statementParams,
 } from '../validators';
@@ -28,20 +28,21 @@ router.get(
   asyncHandler(reportController.tripPilgrimsPdf),
 );
 
+// كشف معتمري مندوب داخل رحلة (from the delegate-trip workspace).
 router.get(
-  '/delegate-pilgrims',
-  validateQuery(delegateReportQuery),
-  asyncHandler(reportController.delegatePilgrimsJson),
+  '/delegate-trip-pilgrims',
+  validateQuery(reportDelegateTripQuery),
+  asyncHandler(reportController.delegateTripPilgrimsJson),
 );
 router.get(
-  '/delegate-pilgrims/excel',
-  validateQuery(delegateReportQuery),
-  asyncHandler(reportController.delegatePilgrimsExcel),
+  '/delegate-trip-pilgrims/excel',
+  validateQuery(reportDelegateTripQuery),
+  asyncHandler(reportController.delegateTripPilgrimsExcel),
 );
 router.get(
-  '/delegate-pilgrims/pdf',
-  validateQuery(delegateReportQuery),
-  asyncHandler(reportController.delegatePilgrimsPdf),
+  '/delegate-trip-pilgrims/pdf',
+  validateQuery(reportDelegateTripQuery),
+  asyncHandler(reportController.delegateTripPilgrimsPdf),
 );
 
 router.get(

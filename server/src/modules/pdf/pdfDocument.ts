@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
-import { PDF_TEXT_FEATURES, toVisualRuns } from './arabicText';
+import { VisualRun, toVisualRuns, wordForFontkit } from './arabicText';
 
 export const FONT_REGULAR = 'AmiriRegular';
 export const FONT_BOLD = 'AmiriBold';
@@ -47,6 +47,15 @@ const normalize = (text: unknown): string =>
  * arabicText.ts (bidi + mirroring) and the runs are placed left to right.
  */
 export class RtlText {
+  /**
+   * Shaping + bidi per measurement is the expensive part of a long table, and
+   * every cell is measured more than once (column widths, row height, draw).
+   * Widths and layouts are cached per font / size.
+   */
+  private fontKey = '';
+  private readonly widthCache = new Map<string, number>();
+  private readonly layoutCache = new Map<string, LayoutLine[]>();
+
   constructor(private readonly doc: PDFKit.PDFDocument) {}
 
   registerFonts(): void {
@@ -60,15 +69,39 @@ export class RtlText {
 
   private withFont(font: string, size: number): void {
     this.doc.font(font).fontSize(size);
+    this.fontKey = `${font}|${size}`;
   }
 
-  private runWidth(text: string): number {
-    return this.doc.widthOfString(text, { features: PDF_TEXT_FEATURES });
+  /**
+   * Arabic letters never join across a space, so a run is shaped word by word
+   * and the words are placed here. Each distinct word is shaped once per font
+   * size for the whole document (names, jobs and cities repeat a lot).
+   */
+  private wordWidth(word: string): number {
+    const key = `${this.fontKey}|${word}`;
+    let width = this.widthCache.get(key);
+    if (width === undefined) {
+      // A single word has no spaces, so PDFKit's own per-word shaping cache
+      // applies (no `features` needed to keep a multi-word run together).
+      width = word === '' ? 0 : this.doc.widthOfString(word);
+      this.widthCache.set(key, width);
+    }
+    return width;
+  }
+
+  /** Words of a visual run, each prepared for fontkit like the run itself. */
+  private runWords(run: VisualRun): string[] {
+    return run.logical.split(' ').map((word) => wordForFontkit(word, run.rtl));
+  }
+
+  private runWidth(run: VisualRun): number {
+    const words = this.runWords(run);
+    return words.reduce((sum, word) => sum + this.wordWidth(word), 0) + (words.length - 1) * this.wordWidth(' ');
   }
 
   /** Width of a single line once shaped, in the current font. */
   private lineWidth(line: string): number {
-    return toVisualRuns(line).reduce((sum, run) => sum + this.runWidth(run.text), 0);
+    return toVisualRuns(line).reduce((sum, run) => sum + this.runWidth(run), 0);
   }
 
   measure(text: string, font = FONT_REGULAR, size = 11): number {
@@ -97,6 +130,9 @@ export class RtlText {
     const size = options.size ?? 11;
     const lineGap = options.lineGap ?? 4;
     this.withFont(font, size);
+    const cacheKey = `${this.fontKey}|${lineGap}|${maxWidth}|${normalize(text)}`;
+    const cached = this.layoutCache.get(cacheKey);
+    if (cached) return cached;
 
     const lineHeight = Math.min(this.doc.currentLineHeight(), size * LINE_HEIGHT_EM) + lineGap;
     const out: LayoutLine[] = [];
@@ -124,6 +160,7 @@ export class RtlText {
       out.push({ logical: current, height: lineHeight });
     }
 
+    this.layoutCache.set(cacheKey, out);
     return out;
   }
 
@@ -144,13 +181,22 @@ export class RtlText {
     const lift = Math.max(0, (this.doc.currentLineHeight() - size * LINE_HEIGHT_EM) / 2);
     let cursor = y;
 
+    const space = this.wordWidth(' ');
     for (const line of lines) {
       const runs = toVisualRuns(line.logical);
-      const widths = runs.map((run) => this.runWidth(run.text));
+      const widths = runs.map((run) => this.runWidth(run));
       const total = widths.reduce((sum, w) => sum + w, 0);
       let cx = align === 'left' ? x : align === 'center' ? x + (width - total) / 2 : x + width - total;
       runs.forEach((run, index) => {
-        this.doc.text(run.text, cx, cursor - lift, { lineBreak: false, features: PDF_TEXT_FEATURES });
+        // Logical word order; an RTL run puts its first word on the right.
+        const words = this.runWords(run);
+        let wx = run.rtl ? cx + widths[index]! : cx;
+        for (const word of words) {
+          const w = this.wordWidth(word);
+          if (run.rtl) wx -= w;
+          if (word !== '') this.doc.text(word, wx, cursor - lift, { lineBreak: false });
+          wx = run.rtl ? wx - space : wx + w + space;
+        }
         cx += widths[index]!;
       });
       cursor += line.height;

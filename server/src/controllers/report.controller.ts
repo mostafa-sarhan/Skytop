@@ -6,12 +6,13 @@ import * as accountService from '../services/delegateAccount.service';
 import { getActor } from '../utils/actor';
 import { ok } from '../utils/http';
 import { buildExcelBuffer, ExcelColumn } from '../modules/excel/excel';
-import { renderStatementPdf, renderTablePdf } from '../modules/pdf/reports.pdf';
+import { PdfRow, renderStatementPdf, renderTablePdf } from '../modules/pdf/reports.pdf';
+import { COMPANY_NAME_AR } from '../config/app';
 import { formatArabicDate, formatMoney } from '../modules/pdf/format';
 import { contentDisposition } from '../utils/contentDisposition';
 import {
   TripReportQuery,
-  DelegateReportQuery,
+  DelegateTripReportQuery,
   MissingDocumentsQuery,
   StatementParams,
   PaymentHistoryQuery,
@@ -34,144 +35,143 @@ const sendExcel = (res: Response, buffer: Buffer, filename: string): void => {
   res.status(200).send(buffer);
 };
 
-const docStatusLabel = (status: string): string => {
-  switch (status) {
-    case 'COMPLETE':
-      return 'مكتمل';
-    case 'MISSING_PASSPORT':
-      return 'صورة جواز السفر ناقصة';
-    case 'MISSING_PHOTO':
-      return 'الصورة الشخصية ناقصة';
-    default:
-      return 'صورة الجواز والصورة الشخصية ناقصتان';
-  }
-};
-
 const methodLabel = (value: string): string => (value === 'CASH' ? 'نقداً' : 'تحويل');
 const transferLabel = (value?: string | null): string =>
   value === 'INSTAPAY' ? 'انستاباي' : value === 'BANK_TRANSFER' ? 'تحويل بنكي' : '';
-const statusLabel = (value: string): string => (value === 'VOIDED' ? 'ملغي' : 'ساري');
+/** Same wording as the payments page. */
+const paymentStatusLabel = (value: string): string => (value === 'VOIDED' ? 'ملغاة' : 'مسجلة');
+const tripStatusLabel = (value: string): string =>
+  value === 'OPEN' ? 'مفتوحة' : value === 'CLOSED' ? 'مغلقة' : 'مكتملة';
 
 const dateOnly = (value?: string | Date | null): string =>
   value ? new Date(value).toISOString().slice(0, 10) : '';
 
+/** File-name safe text (names may contain slashes etc.). */
+const fileSafe = (value: string): string => value.replace(/[\\/:*?"<>|]+/g, '-').trim();
+
 // ---------------------------------------------------------------------------
-// Trip pilgrims list
+// Passenger lists (كشف المعتمرين) — trip, and delegate inside a trip
 // ---------------------------------------------------------------------------
+
+/**
+ * The official list columns: م، الاسم، المهنة، العنوان, then the optional
+ * passport / national ID columns. Widths are Excel character widths and the
+ * PDF uses them as relative weights.
+ */
+const passengerColumns = (options: { passport: boolean; nationalId: boolean; delegate?: boolean }): ExcelColumn[] => [
+  { key: 'index', header: 'م', width: 5, align: 'center' },
+  { key: 'name', header: 'الاسم', width: 28 },
+  { key: 'job', header: 'المهنة', width: 15 },
+  { key: 'address', header: 'العنوان', width: 34 },
+  ...(options.passport ? [{ key: 'passportNumber', header: 'رقم جواز السفر', width: 15, align: 'center' as const }] : []),
+  ...(options.nationalId ? [{ key: 'nationalId', header: 'الرقم القومي', width: 17, align: 'center' as const }] : []),
+  ...(options.delegate ? [{ key: 'delegateName', header: 'المندوب', width: 22 }] : []),
+];
+
+const pdfColumns = (columns: ExcelColumn[]) =>
+  columns.map((c) => ({ key: c.key, header: c.header, width: c.width, align: c.align }));
+
+const passengerCells = (row: Record<string, string | number>) => ({
+  ...row,
+  job: row.job || '—',
+  address: row.address || '—',
+  nationalId: row.nationalId || '—',
+});
 
 export const tripPilgrimsJson = async (req: Request, res: Response): Promise<void> => {
   const { tripId } = getQuery<TripReportQuery>(req);
   ok(res, await reportService.tripPilgrimsReport(tripId));
 };
 
-const tripPilgrimColumns: ExcelColumn[] = [
-  { key: 'index', header: 'م', width: 6 },
-  { key: 'name', header: 'اسم المعتمر', width: 28 },
-  { key: 'passportNumber', header: 'جواز السفر', width: 16 },
-  { key: 'nationalId', header: 'رقم الهوية', width: 16 },
-  { key: 'birthDate', header: 'تاريخ الميلاد', width: 14 },
-  { key: 'job', header: 'المهنة', width: 16 },
-  { key: 'delegateName', header: 'المندوب', width: 22 },
-  { key: 'documentStatus', header: 'حالة الوثائق', width: 24 },
+const tripContext = (report: Awaited<ReturnType<typeof reportService.tripPilgrimsReport>>) => [
+  { label: 'الرحلة', value: report.trip.name },
+  { label: 'حالة الرحلة', value: tripStatusLabel(report.trip.status) },
+  { label: 'تاريخ السفر', value: formatArabicDate(report.trip.departureDate) },
+  { label: 'تاريخ العودة', value: formatArabicDate(report.trip.returnDate) },
+  { label: 'عدد المعتمرين', value: String(report.summary.total) },
+  { label: 'عدد المناديب', value: String(report.summary.delegates) },
 ];
 
 export const tripPilgrimsExcel = async (req: Request, res: Response): Promise<void> => {
-  const { tripId } = getQuery<TripReportQuery>(req);
-  const report = await reportService.tripPilgrimsReport(tripId);
+  const query = getQuery<TripReportQuery>(req);
+  const report = await reportService.tripPilgrimsReport(query.tripId);
   const buffer = await buildExcelBuffer({
-    sheetName: 'معتمرو الرحلة',
-    title: `${report.meta.title} — ${report.trip.name}`,
-    columns: tripPilgrimColumns,
-    rows: report.rows.map((row) => ({ ...row, documentStatus: docStatusLabel(row.documentStatus) })),
-    summary: [
-      { label: 'إجمالي المعتمرين', value: report.summary.total },
-      { label: 'وثائق مكتملة', value: report.summary.completeDocuments },
-      { label: 'وثائق ناقصة', value: report.summary.incompleteDocuments },
-    ],
+    sheetName: 'كشف الرحلة',
+    title: `${COMPANY_NAME_AR} — ${report.meta.title}`,
+    context: tripContext(report),
+    // Excel keeps a delegate column so the sheet can be filtered / sorted.
+    columns: passengerColumns({ ...query, delegate: true }),
+    rows: report.rows.map(passengerCells),
   });
-  sendExcel(res, buffer, `trip-pilgrims-${report.trip.name}.xlsx`);
+  sendExcel(res, buffer, `trip-pilgrims-${fileSafe(report.trip.name)}.xlsx`);
 };
 
 export const tripPilgrimsPdf = async (req: Request, res: Response): Promise<void> => {
-  const { tripId } = getQuery<TripReportQuery>(req);
-  const report = await reportService.tripPilgrimsReport(tripId);
+  const query = getQuery<TripReportQuery>(req);
+  const report = await reportService.tripPilgrimsReport(query.tripId);
+  // Grouped by delegate: a section bar before each delegate's pilgrims.
+  const rows: PdfRow[] = [];
+  let current = '';
+  for (const row of report.rows) {
+    if (row.delegateName !== current) {
+      current = row.delegateName;
+      const count = report.groups.find((g) => g.delegateName === current)?.count ?? 0;
+      rows.push({ __group: `المندوب: ${current} — ${count} معتمر` });
+    }
+    rows.push(passengerCells(row));
+  }
   const buffer = await renderTablePdf({
     title: report.meta.title,
     subtitle: report.trip.name,
-    meta: {
-      'تاريخ المغادرة': report.trip.departureDate,
-      'تاريخ العودة': report.trip.returnDate,
-    },
-    columns: tripPilgrimColumns.map((c) => ({ key: c.key, header: c.header, width: c.width * 1.15 })),
-    rows: report.rows.map((row) => ({ ...row, documentStatus: docStatusLabel(row.documentStatus) })),
-    landscape: true,
-    summary: [
-      { label: 'إجمالي المعتمرين', value: String(report.summary.total) },
-      { label: 'وثائق مكتملة', value: String(report.summary.completeDocuments) },
-      { label: 'وثائق ناقصة', value: String(report.summary.incompleteDocuments) },
-    ],
+    context: tripContext(report),
+    columns: pdfColumns(passengerColumns(query)),
+    rows,
   });
-  sendPdf(res, buffer, `trip-pilgrims-${report.trip.name}.pdf`);
+  sendPdf(res, buffer, `trip-pilgrims-${fileSafe(report.trip.name)}.pdf`);
 };
 
-// ---------------------------------------------------------------------------
-// Delegate pilgrims list
-// ---------------------------------------------------------------------------
-
-export const delegatePilgrimsJson = async (req: Request, res: Response): Promise<void> => {
-  const { delegateId } = getQuery<DelegateReportQuery>(req);
-  ok(res, await reportService.delegatePilgrimsReport(delegateId));
+export const delegateTripPilgrimsJson = async (req: Request, res: Response): Promise<void> => {
+  const { delegateId, tripId } = getQuery<DelegateTripReportQuery>(req);
+  ok(res, await reportService.delegateTripPilgrimsReport(delegateId, tripId));
 };
 
-const delegatePilgrimColumns: ExcelColumn[] = [
-  { key: 'index', header: 'م', width: 6 },
-  { key: 'name', header: 'اسم المعتمر', width: 28 },
-  { key: 'passportNumber', header: 'جواز السفر', width: 16 },
-  { key: 'nationalId', header: 'رقم الهوية', width: 16 },
-  { key: 'tripName', header: 'الرحلة', width: 24 },
-  { key: 'documentStatus', header: 'حالة الوثائق', width: 24 },
+const delegateTripContext = (report: Awaited<ReturnType<typeof reportService.delegateTripPilgrimsReport>>) => [
+  { label: 'الرحلة', value: report.trip.name },
+  { label: 'المندوب', value: report.delegate.name },
+  { label: 'تاريخ السفر', value: formatArabicDate(report.trip.departureDate) },
+  { label: 'تاريخ العودة', value: formatArabicDate(report.trip.returnDate) },
+  { label: 'عدد المعتمرين', value: String(report.summary.total) },
+  { label: 'هاتف المندوب', value: report.delegate.phone },
 ];
 
-export const delegatePilgrimsExcel = async (req: Request, res: Response): Promise<void> => {
-  const { delegateId } = getQuery<DelegateReportQuery>(req);
-  const report = await reportService.delegatePilgrimsReport(delegateId);
+export const delegateTripPilgrimsExcel = async (req: Request, res: Response): Promise<void> => {
+  const query = getQuery<DelegateTripReportQuery>(req);
+  const report = await reportService.delegateTripPilgrimsReport(query.delegateId, query.tripId);
   const buffer = await buildExcelBuffer({
-    sheetName: 'معتمرو المندوب',
-    title: `${report.meta.title} — ${report.delegate.name}`,
-    columns: delegatePilgrimColumns,
-    rows: report.rows.map((row) => ({ ...row, documentStatus: docStatusLabel(row.documentStatus) })),
-    summary: [
-      { label: 'إجمالي المعتمرين', value: report.summary.total },
-      { label: 'إجمالي المطلوب عن الرحلات', value: report.summary.tripsRequired },
-    ],
+    sheetName: 'كشف المعتمرين',
+    title: `${COMPANY_NAME_AR} — ${report.meta.title}`,
+    context: delegateTripContext(report),
+    columns: passengerColumns(query),
+    rows: report.rows.map(passengerCells),
   });
-  sendExcel(res, buffer, `delegate-pilgrims-${report.delegate.name}.xlsx`);
+  sendExcel(res, buffer, `pilgrims-${fileSafe(report.delegate.name)}-${fileSafe(report.trip.name)}.xlsx`);
 };
 
-export const delegatePilgrimsPdf = async (req: Request, res: Response): Promise<void> => {
-  const { delegateId } = getQuery<DelegateReportQuery>(req);
-  const report = await reportService.delegatePilgrimsReport(delegateId);
+export const delegateTripPilgrimsPdf = async (req: Request, res: Response): Promise<void> => {
+  const query = getQuery<DelegateTripReportQuery>(req);
+  const report = await reportService.delegateTripPilgrimsReport(query.delegateId, query.tripId);
   const buffer = await renderTablePdf({
     title: report.meta.title,
-    subtitle: report.delegate.name,
-    meta: { الهاتف: report.delegate.phone },
-    columns: delegatePilgrimColumns.map((c) => ({
-      key: c.key,
-      header: c.header,
-      width: c.width * 1.3,
-    })),
-    rows: report.rows.map((row) => ({ ...row, documentStatus: docStatusLabel(row.documentStatus) })),
-    landscape: true,
-    summary: [
-      { label: 'إجمالي المعتمرين', value: String(report.summary.total) },
-      { label: 'إجمالي المطلوب عن الرحلات', value: formatMoney(report.summary.tripsRequired) },
-    ],
+    subtitle: `${report.delegate.name} — ${report.trip.name}`,
+    context: delegateTripContext(report),
+    columns: pdfColumns(passengerColumns(query)),
+    rows: report.rows.map(passengerCells),
   });
-  sendPdf(res, buffer, `delegate-pilgrims-${report.delegate.name}.pdf`);
+  sendPdf(res, buffer, `pilgrims-${fileSafe(report.delegate.name)}-${fileSafe(report.trip.name)}.pdf`);
 };
 
 // ---------------------------------------------------------------------------
-// Missing documents
+// كشف النواقص (missing documents)
 // ---------------------------------------------------------------------------
 
 export const missingDocumentsJson = async (req: Request, res: Response): Promise<void> => {
@@ -180,60 +180,57 @@ export const missingDocumentsJson = async (req: Request, res: Response): Promise
 };
 
 const missingDocColumns: ExcelColumn[] = [
-  { key: 'name', header: 'اسم المعتمر', width: 28 },
-  { key: 'passportNumber', header: 'جواز السفر', width: 16 },
+  { key: 'index', header: 'م', width: 5, align: 'center' },
+  { key: 'name', header: 'الاسم', width: 28 },
+  { key: 'passportNumber', header: 'رقم جواز السفر', width: 15, align: 'center' },
   { key: 'tripName', header: 'الرحلة', width: 22 },
   { key: 'delegateName', header: 'المندوب', width: 22 },
-  { key: 'hasPassportImage', header: 'صورة الجواز', width: 14 },
-  { key: 'hasPersonalPhoto', header: 'الصورة الشخصية', width: 14 },
+  { key: 'missing', header: 'المستندات الناقصة', width: 32 },
 ];
 
-const yesNo = (value: boolean): string => (value ? 'موجودة' : 'ناقصة');
+const missingText = (row: { hasPassportImage: boolean; hasPersonalPhoto: boolean }): string =>
+  [!row.hasPassportImage ? 'صورة جواز السفر' : '', !row.hasPersonalPhoto ? 'الصورة الشخصية' : '']
+    .filter(Boolean)
+    .join('، ');
+
+const missingContext = (report: Awaited<ReturnType<typeof reportService.missingDocumentsReport>>) => [
+  { label: 'الرحلة', value: report.meta.filters.trip ?? 'كل الرحلات' },
+  { label: 'المندوب', value: report.meta.filters.delegate ?? 'كل المناديب' },
+  { label: 'ملفات ناقصة', value: `${report.summary.incomplete} من ${report.summary.total} معتمر` },
+  { label: 'ناقص صورة الجواز', value: String(report.summary.missingPassport) },
+  { label: 'ناقص الصورة الشخصية', value: String(report.summary.missingPhoto) },
+];
+
+const missingRows = (report: Awaited<ReturnType<typeof reportService.missingDocumentsReport>>) =>
+  report.rows.map((row) => ({
+    index: row.index,
+    name: row.name,
+    passportNumber: row.passportNumber,
+    tripName: row.tripName,
+    delegateName: row.delegateName,
+    missing: missingText(row),
+  }));
 
 export const missingDocumentsExcel = async (req: Request, res: Response): Promise<void> => {
-  const query = getQuery<MissingDocumentsQuery>(req);
-  const report = await reportService.missingDocumentsReport(query);
+  const report = await reportService.missingDocumentsReport(getQuery<MissingDocumentsQuery>(req));
   const buffer = await buildExcelBuffer({
-    sheetName: 'الوثائق الناقصة',
-    title: report.meta.title,
+    sheetName: 'كشف النواقص',
+    title: `${COMPANY_NAME_AR} — ${report.meta.title}`,
+    context: missingContext(report),
     columns: missingDocColumns,
-    rows: report.rows.map((row) => ({
-      ...row,
-      hasPassportImage: yesNo(row.hasPassportImage),
-      hasPersonalPhoto: yesNo(row.hasPersonalPhoto),
-    })),
-    summary: [
-      { label: 'إجمالي المعتمرين', value: report.summary.total },
-      { label: 'حالات ناقصة', value: report.summary.incomplete },
-      { label: 'ناقصة صورة الجواز', value: report.summary.missingPassport },
-      { label: 'ناقصة الصورة الشخصية', value: report.summary.missingPhoto },
-    ],
+    rows: missingRows(report),
   });
   sendExcel(res, buffer, 'missing-documents.xlsx');
 };
 
 export const missingDocumentsPdf = async (req: Request, res: Response): Promise<void> => {
-  const query = getQuery<MissingDocumentsQuery>(req);
-  const report = await reportService.missingDocumentsReport(query);
+  const report = await reportService.missingDocumentsReport(getQuery<MissingDocumentsQuery>(req));
   const buffer = await renderTablePdf({
     title: report.meta.title,
-    meta: {
-      ...(report.meta.filters.trip ? { الرحلة: report.meta.filters.trip } : {}),
-      ...(report.meta.filters.delegate ? { المندوب: report.meta.filters.delegate } : {}),
-    },
-    columns: missingDocColumns.map((c) => ({ key: c.key, header: c.header, width: c.width * 1.3 })),
-    rows: report.rows.map((row) => ({
-      ...row,
-      hasPassportImage: yesNo(row.hasPassportImage),
-      hasPersonalPhoto: yesNo(row.hasPersonalPhoto),
-    })),
+    context: missingContext(report),
+    columns: pdfColumns(missingDocColumns),
+    rows: missingRows(report),
     landscape: true,
-    summary: [
-      { label: 'إجمالي المعتمرين', value: String(report.summary.total) },
-      { label: 'حالات ناقصة', value: String(report.summary.incomplete) },
-      { label: 'ناقصة صورة الجواز', value: String(report.summary.missingPassport) },
-      { label: 'ناقصة الصورة الشخصية', value: String(report.summary.missingPhoto) },
-    ],
   });
   sendPdf(res, buffer, 'missing-documents.pdf');
 };
@@ -376,55 +373,69 @@ export const statementExcel = async (req: Request, res: Response): Promise<void>
 // ---------------------------------------------------------------------------
 
 const paymentColumns: ExcelColumn[] = [
+  { key: 'index', header: 'م', width: 5, align: 'center' },
   { key: 'receiptNumber', header: 'رقم الإيصال الورقي', width: 18 },
   { key: 'delegateName', header: 'المندوب', width: 24 },
-  { key: 'amount', header: 'المبلغ', width: 14 },
+  { key: 'amount', header: 'المبلغ', width: 14, money: true },
   { key: 'paymentMethod', header: 'طريقة الدفع', width: 12 },
   { key: 'transferType', header: 'نوع التحويل', width: 14 },
   { key: 'referenceNumber', header: 'رقم المرجع', width: 18 },
   { key: 'paymentDate', header: 'تاريخ الدفعة', width: 14 },
   { key: 'status', header: 'الحالة', width: 10 },
-  { key: 'createdBy', header: 'الموظف', width: 20 },
+  { key: 'createdBy', header: 'سجّلها', width: 20 },
 ];
 
+const paymentContext = (report: Awaited<ReturnType<typeof reportService.paymentHistoryReport>>) => [
+  { label: 'المندوب', value: report.meta.filters.delegate ?? 'كل المناديب' },
+  {
+    label: 'الفترة',
+    value:
+      report.meta.filters.from || report.meta.filters.to
+        ? `${report.meta.filters.from ? formatArabicDate(report.meta.filters.from) : '…'} — ${report.meta.filters.to ? formatArabicDate(report.meta.filters.to) : '…'}`
+        : 'كل الفترات',
+  },
+];
+
+const paymentLabels = (row: Awaited<ReturnType<typeof reportService.paymentHistoryReport>>['rows'][number]) => ({
+  ...row,
+  paymentMethod: methodLabel(row.paymentMethod),
+  transferType: transferLabel(row.transferType) || '—',
+  referenceNumber: row.referenceNumber || '—',
+  status: paymentStatusLabel(row.status),
+});
+
 export const paymentsJson = async (req: Request, res: Response): Promise<void> => {
-  const query = getQuery<PaymentHistoryQuery>(req);
-  ok(res, await reportService.paymentHistoryReport(query));
+  ok(res, await reportService.paymentHistoryReport(getQuery<PaymentHistoryQuery>(req)));
 };
 
 export const paymentsExcel = async (req: Request, res: Response): Promise<void> => {
-  const query = getQuery<PaymentHistoryQuery>(req);
-  const report = await reportService.paymentHistoryReport(query);
+  const report = await reportService.paymentHistoryReport(getQuery<PaymentHistoryQuery>(req));
   const buffer = await buildExcelBuffer({
     sheetName: 'الدفعات',
-    title: report.meta.title,
+    title: `${COMPANY_NAME_AR} — ${report.meta.title}`,
+    context: paymentContext(report),
     columns: paymentColumns,
-    rows: report.rows.map((row) => ({
-      ...row,
-      paymentMethod: methodLabel(row.paymentMethod),
-      transferType: transferLabel(row.transferType),
-      status: statusLabel(row.status),
-    })),
-    summary: [{ label: 'إجمالي الدفعات السارية', value: report.summary.totalActive }],
+    rows: report.rows.map((row) => ({ ...paymentLabels(row), amount: Number(row.amount) })),
+    summary: [
+      { label: 'عدد الدفعات المسجلة', value: report.summary.activeCount },
+      { label: 'إجمالي الدفعات المسجلة (بدون الملغاة)', value: report.summary.totalActive },
+    ],
   });
   sendExcel(res, buffer, 'payments.xlsx');
 };
 
 export const paymentsPdf = async (req: Request, res: Response): Promise<void> => {
-  const query = getQuery<PaymentHistoryQuery>(req);
-  const report = await reportService.paymentHistoryReport(query);
+  const report = await reportService.paymentHistoryReport(getQuery<PaymentHistoryQuery>(req));
   const buffer = await renderTablePdf({
     title: report.meta.title,
-    columns: paymentColumns.map((c) => ({ key: c.key, header: c.header, width: c.width * 1.25 })),
-    rows: report.rows.map((row) => ({
-      ...row,
-      paymentMethod: methodLabel(row.paymentMethod),
-      transferType: transferLabel(row.transferType) || '-',
-      status: statusLabel(row.status),
-      amount: formatMoney(row.amount),
-    })),
+    context: paymentContext(report),
+    columns: pdfColumns(paymentColumns),
+    rows: report.rows.map((row) => ({ ...paymentLabels(row), amount: formatMoney(row.amount), paymentDate: formatArabicDate(row.paymentDate) })),
     landscape: true,
-    summary: [{ label: 'إجمالي الدفعات السارية', value: formatMoney(report.summary.totalActive) }],
+    summary: [
+      { label: 'عدد الدفعات المسجلة', value: String(report.summary.activeCount) },
+      { label: 'إجمالي الدفعات المسجلة (بدون الملغاة)', value: `${formatMoney(report.summary.totalActive)} جنيه` },
+    ],
   });
   sendPdf(res, buffer, 'payments.pdf');
 };

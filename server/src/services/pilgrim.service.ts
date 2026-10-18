@@ -12,6 +12,7 @@ import { AppError } from '../utils/AppError';
 import { writeAuditLog } from '../utils/audit';
 import { buildPage } from '../utils/pagination';
 import { withTransaction } from '../utils/transaction';
+import { sortByArabic } from '../utils/arabicSort';
 import {
   assertTripAcceptsNewPilgrims,
   assertTripAllowsCancellation,
@@ -176,6 +177,7 @@ interface CreatePilgrimInput {
   nationalId?: string;
   birthDate?: Date;
   job?: string;
+  address?: string;
   notes?: string;
   delegateId: string;
   tripId: string;
@@ -211,10 +213,11 @@ const assertDelegateAssignedToTrip = async (delegateId: string, tripId: string) 
 };
 
 /** Edit: optional fields may be null to clear them. */
-type UpdatePilgrimInput = Partial<Omit<CreatePilgrimInput, 'nationalId' | 'birthDate' | 'job' | 'notes'>> & {
+type UpdatePilgrimInput = Partial<Omit<CreatePilgrimInput, 'nationalId' | 'birthDate' | 'job' | 'address' | 'notes'>> & {
   nationalId?: string | null;
   birthDate?: Date | null;
   job?: string | null;
+  address?: string | null;
   notes?: string | null;
 };
 
@@ -469,7 +472,8 @@ export const listDelegateTripPilgrims = async (
         documents: { select: { type: true } },
         cancelledBy: { select: { id: true, fullName: true } },
       },
-      orderBy: status === 'CANCELLED' ? [{ cancelledAt: 'desc' }] : [{ name: 'asc' }],
+      // ACTIVE: alphabetical (Arabic collation, applied below); CANCELLED: latest first.
+      orderBy: status === 'CANCELLED' ? [{ cancelledAt: 'desc' }] : [{ createdAt: 'asc' }],
     }),
     prisma.pilgrim.groupBy({
       by: ['status'],
@@ -480,13 +484,15 @@ export const listDelegateTripPilgrims = async (
   const countOf = (s: 'ACTIVE' | 'CANCELLED') =>
     statusCounts.find((c) => c.status === s)?._count._all ?? 0;
 
-  const items = pilgrims.map(({ documents, ...p }) => ({
+  const ordered = status === 'ACTIVE' ? sortByArabic(pilgrims, (p) => p.name) : pilgrims;
+  const items = ordered.map(({ documents, ...p }) => ({
     id: p.id,
     name: p.name,
     passportNumber: p.passportNumber,
     nationalId: p.nationalId,
     birthDate: p.birthDate ? p.birthDate.toISOString() : null,
     job: p.job,
+    address: p.address,
     notes: p.notes,
     status: p.status,
     createdAt: p.createdAt.toISOString(),

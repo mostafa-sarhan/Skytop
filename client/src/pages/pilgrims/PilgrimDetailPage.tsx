@@ -175,8 +175,10 @@ export const PilgrimDetailPage = () => {
               <dd className="mono">{data.nationalId || '—'}</dd>
               <dt>تاريخ الميلاد</dt>
               <dd className="mono">{data.birthDate ? formatDate(data.birthDate) : '—'}</dd>
-              <dt>الوظيفة</dt>
+              <dt>المهنة</dt>
               <dd>{data.job || '—'}</dd>
+              <dt>العنوان</dt>
+              <dd>{data.address || '—'}</dd>
               <dt>الملاحظات</dt>
               <dd className="pre-wrap">{data.notes || '—'}</dd>
             </dl>

@@ -24,6 +24,7 @@ import {
   TextInput,
 } from '../../ui/primitives';
 import { CancelPilgrimModal, TransferModal } from '../../components/PilgrimModals';
+import { PassengerListExport } from '../../components/PassengerListExport';
 
 /**
  * Main operational workspace: the pilgrims of ONE delegate in ONE trip.
@@ -38,6 +39,7 @@ export const DelegateTripPilgrimsPage = () => {
   const [docFilter, setDocFilter] = useState<'ALL' | 'INCOMPLETE'>('ALL');
   const [transferring, setTransferring] = useState<DelegateTripPilgrim | null>(null);
   const [cancelling, setCancelling] = useState<DelegateTripPilgrim | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const { data, loading, error, reload } = useAsync<DelegateTripPilgrims>(
     (signal) =>
@@ -120,6 +122,9 @@ export const DelegateTripPilgrimsPage = () => {
                 <Icon name="plus" size={15} /> إضافة معتمر
               </Link>
             ) : null}
+            <button type="button" className="btn secondary" onClick={() => setExporting(true)}>
+              <Icon name="download" size={15} /> طباعة كشف المعتمرين
+            </button>
             <Link className="btn secondary" to={`/trips/${trip.id}`}>
               <Icon name="bus" size={15} /> صفحة الرحلة
             </Link>
@@ -258,7 +263,7 @@ export const DelegateTripPilgrimsPage = () => {
                   <th>رقم الجواز</th>
                   <th>الرقم القومي</th>
                   <th>تاريخ الميلاد</th>
-                  <th>الوظيفة</th>
+                  <th>المهنة</th>
                   <th>حالة المستندات</th>
                   <th></th>
                 </tr>
@@ -336,6 +341,16 @@ export const DelegateTripPilgrimsPage = () => {
           }}
           onClose={() => setTransferring(null)}
           onDone={reload}
+        />
+      ) : null}
+
+      {exporting ? (
+        <PassengerListExport
+          title="كشف معتمري المندوب"
+          description={`المعتمرون النشطون للمندوب ${delegate.name} في ${trip.name} (${summary.total} معتمر) — المستبعدون لا يظهرون في الكشف.`}
+          endpoint="/reports/delegate-trip-pilgrims"
+          query={{ delegateId: delegate.id, tripId: trip.id }}
+          onClose={() => setExporting(false)}
         />
       ) : null}
 

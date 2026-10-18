@@ -5,11 +5,15 @@ export interface ExcelColumn {
   header: string;
   width: number;
   align?: 'left' | 'center' | 'right';
+  /** Numeric money column (2 decimals). Other numbers are whole counts. */
+  money?: boolean;
 }
 
 export interface ExcelInput {
   sheetName: string;
   title?: string;
+  /** Context lines under the title, e.g. الرحلة / المندوب / تاريخ السفر. */
+  context?: Array<{ label: string; value: string | number }>;
   columns: ExcelColumn[];
   rows: Array<Record<string, string | number>>;
   summary?: Array<{ label: string; value: string | number }>;
@@ -32,10 +36,14 @@ export const buildExcelBuffer = async (input: ExcelInput): Promise<Buffer> => {
   workbook.creator = 'Sky Top';
   workbook.created = new Date();
 
+  // Rows above the table header (title + context + spacer) stay frozen with it.
+  const contextRows = input.context?.length ? input.context.length + 1 : 0;
+  const headerRowIndex = (input.title ? 1 : 0) + contextRows + 1;
   const sheet = workbook.addWorksheet(input.sheetName.slice(0, 31), {
-    views: [{ rightToLeft: true, state: 'frozen', ySplit: 2 }],
+    views: [{ rightToLeft: true, state: 'frozen', ySplit: headerRowIndex }],
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
+  sheet.pageSetup.printTitlesRow = `${headerRowIndex}:${headerRowIndex}`;
 
   let rowIndex = 1;
 
@@ -46,6 +54,22 @@ export const buildExcelBuffer = async (input: ExcelInput): Promise<Buffer> => {
     titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FF7422F0' } };
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
     sheet.getRow(rowIndex).height = 26;
+    rowIndex += 1;
+  }
+
+  if (input.context?.length) {
+    for (const item of input.context) {
+      sheet.mergeCells(rowIndex, 2, rowIndex, Math.max(2, input.columns.length));
+      const label = sheet.getCell(rowIndex, 1);
+      label.value = item.label;
+      label.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF4B5563' } };
+      label.alignment = { horizontal: 'right' };
+      const value = sheet.getCell(rowIndex, 2);
+      value.value = item.value;
+      value.font = { name: 'Arial', size: 10, bold: true };
+      value.alignment = { horizontal: 'right' };
+      rowIndex += 1;
+    }
     rowIndex += 1;
   }
 
@@ -79,16 +103,16 @@ export const buildExcelBuffer = async (input: ExcelInput): Promise<Buffer> => {
         vertical: 'middle',
         wrapText: true,
       };
-      if (typeof raw === 'number') cell.numFmt = '#,##0.00';
+      if (typeof raw === 'number') cell.numFmt = column.money ? '#,##0.00' : '0';
       cell.border = {
         bottom: { style: 'hair', color: { argb: 'FFE5E7EB' } },
         top: { style: 'hair', color: { argb: 'FFE5E7EB' } },
         left: { style: 'hair', color: { argb: 'FFE5E7EB' } },
         right: { style: 'hair', color: { argb: 'FFE5E7EB' } },
       };
-      if ((rowIndex - (input.title ? 3 : 2)) % 2 === 1) cell.fill = ALT_FILL;
+      if ((rowIndex - headerRowIndex) % 2 === 0) cell.fill = ALT_FILL;
     });
-    dataRow.height = 18;
+    // No fixed height: wrapped names / addresses keep their full text.
     rowIndex += 1;
   });
 

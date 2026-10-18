@@ -191,6 +191,7 @@ export const createPilgrimSchema = z
       .or(z.literal('').transform(() => undefined)),
     birthDate: dateOnly.optional(),
     job: optionalText(120, 'المهنة'),
+    address: optionalText(255, 'العنوان'),
     notes: optionalText(1000, 'الملاحظات'),
     delegateId: uuid,
     tripId: uuid,
@@ -208,6 +209,7 @@ export const updatePilgrimSchema = z
     nationalId: clearable(z.string().trim().regex(/^\d{6,20}$/, 'الرقم القومي غير صحيح')),
     birthDate: clearable(dateOnly),
     job: clearable(z.string().trim().max(120, 'المهنة طويل جداً')),
+    address: clearable(z.string().trim().max(255, 'العنوان طويل جداً')),
     notes: clearable(z.string().trim().max(1000, 'الملاحظات طويل جداً')),
     delegateId: uuid.optional(),
   })
@@ -318,8 +320,12 @@ export const paymentListQuery = paginationQuery.extend({
 // Reports
 // ---------------------------------------------------------------------------
 
-export const reportTripQuery = z.object({ tripId: uuid });
-export const reportDelegateQuery = z.object({ delegateId: uuid });
+// Passenger lists: passport number / national ID columns are optional (default shown).
+const columnFlag = z.enum(['0', '1']).default('1').transform((v) => v === '1');
+const passengerColumnsQuery = { passport: columnFlag, nationalId: columnFlag };
+
+export const reportTripQuery = z.object({ tripId: uuid, ...passengerColumnsQuery });
+export const reportDelegateTripQuery = z.object({ delegateId: uuid, tripId: uuid, ...passengerColumnsQuery });
 
 export const missingDocumentsQuery = z.object({
   tripId: uuid.optional(),
@@ -335,7 +341,7 @@ export const paymentHistoryQuery = z.object({
 });
 
 export type TripReportQuery = z.infer<typeof reportTripQuery>;
-export type DelegateReportQuery = z.infer<typeof reportDelegateQuery>;
+export type DelegateTripReportQuery = z.infer<typeof reportDelegateTripQuery>;
 export type MissingDocumentsQuery = z.infer<typeof missingDocumentsQuery>;
 export type StatementParams = z.infer<typeof statementParams>;
 export type PaymentHistoryQuery = z.infer<typeof paymentHistoryQuery>;
@@ -354,4 +360,3 @@ export type AdjustmentListQuery = z.infer<typeof adjustmentListQuery>;
 export { uuidParam };
 
 export { uuid } from './common';
-export { reportDelegateQuery as delegateReportQuery };

@@ -187,6 +187,7 @@ model Pilgrim {
   nationalId     String?       @db.VarChar(40)
   birthDate      DateTime?     @db.Date
   job            String?       @db.VarChar(120)
+  address        String?       @db.VarChar(255)
   notes          String?
   delegateId     String        @db.Uuid
   tripId         String        @db.Uuid

@@ -16,12 +16,17 @@ export interface PdfColumn {
   align?: 'right' | 'left' | 'center';
 }
 
+/** A table row, or a full-width section bar (e.g. one delegate inside a trip list). */
+export type PdfRow = Record<string, string | number> & { __group?: string };
+
 export interface PdfTableInput {
   title: string;
   subtitle?: string;
   meta?: Record<string, string>;
+  /** Official context box on the first page (label / value pairs, two per line). */
+  context?: Array<{ label: string; value: string }>;
   columns: PdfColumn[];
-  rows: Array<Record<string, string | number>>;
+  rows: PdfRow[];
   landscape?: boolean;
   summary?: Array<{ label: string; value: string }>;
   footerNote?: string;
@@ -53,7 +58,9 @@ const columnWidths = (rtl: RtlText, input: PdfTableInput, contentWidth: number):
   const longestToken = (text: string, font: string) =>
     Math.max(0, ...text.split(/\s+/).filter(Boolean).map((t) => rtl.measure(t, font, BODY_SIZE)));
   const mins = input.columns.map((column) => {
-    const cells = input.rows.map((row) => longestToken(String(row[column.key] ?? ''), FONT_REGULAR));
+    const cells = input.rows
+      .filter((row) => !row.__group)
+      .map((row) => longestToken(String(row[column.key] ?? ''), FONT_REGULAR));
     const widest = Math.max(longestToken(column.header, FONT_BOLD), ...cells);
     return Math.min(widest + CELL_PAD_X * 2 + 2, contentWidth * 0.35);
   });
@@ -104,6 +111,36 @@ export const renderTablePdf = async (input: PdfTableInput): Promise<Buffer> => {
     });
   })();
 
+  /** Bordered box, two label/value pairs per line, first pair on the right. */
+  const drawContext = (top: number): number => {
+    const items = input.context ?? [];
+    const half = (contentWidth - 24) / 2;
+    const labelW = 110;
+    const valueW = half - labelW - 10;
+    const labelOpts = { size: 10.5, lineGap: 2 };
+    const valueOpts = { font: FONT_BOLD, size: 10.5, lineGap: 2 };
+    // Each line is as tall as its tallest label / value (long values wrap).
+    const lineHeights: number[] = [];
+    for (let i = 0; i < items.length; i += 2) {
+      const pair = items.slice(i, i + 2);
+      lineHeights.push(
+        Math.max(...pair.flatMap((item) => [rtl.height(`${item.label}:`, labelW, labelOpts), rtl.height(item.value, valueW, valueOpts)])) + 4,
+      );
+    }
+    const boxH = lineHeights.reduce((sum, h) => sum + h, 0) + 12;
+    doc.rect(PAGE_PADDING, top, contentWidth, boxH).lineWidth(0.8).strokeColor('#d1d5db').stroke();
+    let lineTop = top + 6;
+    items.forEach((item, i) => {
+      const cellRight = right - 12 - (i % 2) * half;
+      doc.fillColor('#6b7280');
+      rtl.draw(`${item.label}:`, cellRight - labelW, lineTop, { ...labelOpts, width: labelW, align: 'right' });
+      doc.fillColor('#111827');
+      rtl.draw(item.value, cellRight - labelW - 10 - valueW, lineTop, { ...valueOpts, width: valueW, align: 'right' });
+      if (i % 2 === 1 || i === items.length - 1) lineTop += lineHeights[Math.floor(i / 2)]!;
+    });
+    return boxH;
+  };
+
   const drawHeader = (firstPage: boolean): number => {
     let y = PAGE_PADDING;
     doc.fillColor(BRAND);
@@ -132,8 +169,9 @@ export const renderTablePdf = async (input: PdfTableInput): Promise<Buffer> => {
         const text = metaEntries.map(([k, v]) => `${k}: ${v}`).join('   |   ');
         y += rtl.draw(text, PAGE_PADDING, y, { width: contentWidth, align: 'right', size: 10 });
       }
+      if (input.context?.length) y += drawContext(y + 4) + 4;
       doc.fillColor('#9ca3af');
-      y += rtl.draw(`تاريخ التقرير: ${formatArabicDate(new Date())}`, PAGE_PADDING, y, {
+      y += rtl.draw(`تاريخ الطباعة: ${formatArabicDate(new Date())}`, PAGE_PADDING, y, {
         width: contentWidth,
         align: 'right',
         size: 10,
@@ -165,7 +203,7 @@ export const renderTablePdf = async (input: PdfTableInput): Promise<Buffer> => {
 
   const bodyOptions = { font: FONT_REGULAR, size: BODY_SIZE, lineGap: BODY_GAP };
   const cellText = (row: Record<string, string | number>, key: string) => String(row[key] ?? '');
-  const rowHeightOf = (row: Record<string, string | number>) =>
+  const rowHeightOf = (row: PdfRow) =>
     Math.max(
       ...columns.map((c) => rtl.height(cellText(row, c.key), c.width - CELL_PAD_X * 2, bodyOptions)),
     ) +
@@ -187,11 +225,41 @@ export const renderTablePdf = async (input: PdfTableInput): Promise<Buffer> => {
     });
   }
 
+  const groupOptions = { font: FONT_BOLD, size: 10.5, lineGap: BODY_GAP };
+  const groupHeightOf = (label: string) =>
+    rtl.height(label, contentWidth - CELL_PAD_X * 2, groupOptions) + CELL_PAD_Y * 2;
+  const drawGroup = (label: string) => {
+    const groupHeight = groupHeightOf(label);
+    doc.rect(PAGE_PADDING, y, contentWidth, groupHeight).fill('#ede4fd');
+    doc.fillColor('#3b0f8c');
+    rtl.draw(label, PAGE_PADDING + CELL_PAD_X, y + CELL_PAD_Y, {
+      ...groupOptions,
+      width: contentWidth - CELL_PAD_X * 2,
+      align: 'right',
+    });
+    y += groupHeight;
+  };
+  let stripe = 0;
+  let currentGroup: string | null = null;
   input.rows.forEach((row, index) => {
+    if (row.__group) {
+      // Keep the section bar with at least its first row.
+      const next = input.rows[index + 1];
+      const nextHeight = next && !next.__group ? rowHeightOf(next) : 0;
+      if (y + groupHeightOf(row.__group) + nextHeight > bottomLimit) y = newPage();
+      currentGroup = row.__group;
+      drawGroup(row.__group);
+      stripe = 0;
+      return;
+    }
     const rowHeight = rowHeightOf(row);
-    if (y + rowHeight > bottomLimit) y = newPage();
+    if (y + rowHeight > bottomLimit) {
+      y = newPage();
+      // A section that continues on a new page repeats its bar.
+      if (currentGroup) drawGroup(`${currentGroup} (تابع)`);
+    }
 
-    if (index % 2 === 1) doc.rect(PAGE_PADDING, y, contentWidth, rowHeight).fill('#f6f8fb');
+    if (stripe++ % 2 === 1) doc.rect(PAGE_PADDING, y, contentWidth, rowHeight).fill('#f6f8fb');
     for (const column of columns) {
       doc.fillColor('#111827');
       rtl.draw(cellText(row, column.key), column.x + CELL_PAD_X, y + CELL_PAD_Y, {
@@ -298,5 +366,5 @@ export const renderStatementPdf = async (input: {
     landscape: true,
     summary: input.summary,
     footerNote:
-      'المطلوب محسوب من عدد المعتمرين الحاليين × سعر الفرد المتفق عليه لكل رحلة، والمدفوع من الدفعات السارية.',
+      'المطلوب = عدد المعتمرين النشطين × سعر الفرد المتفق عليه لكل رحلة، والمدفوع = الدفعات المسجلة (بدون الملغاة).',
   });

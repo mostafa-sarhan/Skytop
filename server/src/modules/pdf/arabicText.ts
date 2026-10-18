@@ -12,21 +12,19 @@ import bidiFactory from 'bidi-js';
  *   a real script: an Arabic one makes the run RTL and fontkit reverses the
  *   glyphs. It does not run the Unicode bidi algorithm, so a mixed line (e.g.
  *   Arabic with a date) would come out with reversed digits.
- * - PDFKit also splits text at spaces and shapes word by word in logical order
- *   unless `features` are passed; we always pass them (PDF_TEXT_FEATURES) so a
- *   whole run is shaped and ordered at once.
+ * - Arabic letters never join across a space, so each word can be shaped on
+ *   its own. pdfDocument.ts draws word by word (positions computed there), which
+ *   also lets PDFKit reuse its per-word shaping cache — fontkit shaping is the
+ *   slow part of long reports.
  *
  * So each line is split here into directional runs with the Unicode Bidi
  * Algorithm (bidi-js), the runs are put in visual (left-to-right) order, RTL
- * brackets are mirrored, and every run is handed to fontkit so that fontkit's
+ * brackets are mirrored, and every word is handed to fontkit so that fontkit's
  * own reversal yields the correct visual order. No manual string reversal is
  * applied to Arabic letters.
  */
 
 const bidi = bidiFactory();
-
-/** Forces whole-run shaping in PDFKit (see module comment). */
-export const PDF_TEXT_FEATURES: PDFKit.Mixins.OpenTypeFeatures[] = [];
 
 const STRONG_RTL = /[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}]/u;
 const HAS_REAL_SCRIPT = /[^\p{Script=Common}\p{Script=Inherited}\p{Script=Unknown}]/u;
@@ -42,6 +40,8 @@ const reverseCodePoints = (text: string): string => Array.from(text).reverse().j
 export interface VisualRun {
   /** String to pass to PDFKit for this run. */
   text: string;
+  /** The run's characters in logical order (before any compensation). */
+  logical: string;
   /** Whether the run reads right-to-left (odd bidi level). */
   rtl: boolean;
 }
@@ -89,6 +89,13 @@ export const toVisualRuns = (line: string): VisualRun[] => {
     // fontkit reverses some runs on its own; compensate only when its choice
     // differs from the bidi result (e.g. an RTL run of punctuation only).
     const text = fontkitLaysOutRtl(logical) === rtl ? logical : reverseCodePoints(logical);
-    return { text, rtl };
+    return { text, logical, rtl };
   });
 };
+
+/**
+ * One word of a run, drawn on its own: apply the same rule per word, so a
+ * word fontkit would lay out in the other direction is compensated.
+ */
+export const wordForFontkit = (logicalWord: string, rtl: boolean): string =>
+  fontkitLaysOutRtl(logicalWord) === rtl ? logicalWord : reverseCodePoints(logicalWord);
