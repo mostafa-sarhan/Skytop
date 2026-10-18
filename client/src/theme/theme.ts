@@ -3,6 +3,8 @@
  * detected and applied. The theme is an attribute on <html>
  * (data-theme="light" | "dark") consumed by the tokens in styles/tokens.css.
  *
+ * First visit: dark. After the user toggles, the saved choice always wins.
+ *
  * index.html runs a tiny inline copy of `resolveInitialTheme` before the app
  * loads so the first paint already uses the right theme (no flash). Keep the
  * storage key in sync with that script.
@@ -13,11 +15,6 @@ export type Theme = 'light' | 'dark';
 export const THEME_STORAGE_KEY = 'skytop-theme';
 
 const THEME_COLORS: Record<Theme, string> = { light: '#7422f0', dark: '#1b1826' };
-
-const darkQuery = () =>
-  typeof window !== 'undefined' && window.matchMedia
-    ? window.matchMedia('(prefers-color-scheme: dark)')
-    : null;
 
 /** The user's explicit choice, if any (storage may be unavailable). */
 export const readStoredTheme = (): Theme | null => {
@@ -37,21 +34,13 @@ export const storeTheme = (theme: Theme): void => {
   }
 };
 
-export const systemTheme = (): Theme => (darkQuery()?.matches ? 'dark' : 'light');
+/** Dark is the product default; the OS preference is intentionally not used. */
+export const DEFAULT_THEME: Theme = 'dark';
 
-/** Saved choice first, otherwise the operating-system preference. */
-export const resolveInitialTheme = (): Theme => readStoredTheme() ?? systemTheme();
+/** Saved choice first, otherwise the dark default. */
+export const resolveInitialTheme = (): Theme => readStoredTheme() ?? DEFAULT_THEME;
 
 export const applyTheme = (theme: Theme): void => {
   document.documentElement.dataset.theme = theme;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[theme]);
-};
-
-/** Follows OS changes while the user has not chosen a theme explicitly. */
-export const onSystemThemeChange = (listener: (theme: Theme) => void): (() => void) => {
-  const query = darkQuery();
-  if (!query) return () => undefined;
-  const handler = (event: MediaQueryListEvent) => listener(event.matches ? 'dark' : 'light');
-  query.addEventListener('change', handler);
-  return () => query.removeEventListener('change', handler);
 };

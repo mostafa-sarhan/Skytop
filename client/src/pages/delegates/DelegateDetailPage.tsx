@@ -151,7 +151,7 @@ export const DelegateDetailPage = () => {
             ) : null}
             {trips.data && trips.data.length > 0 ? (
               <div className="table-wrap">
-                <table className="data">
+                <table className="data stack-on-phone">
                   <thead>
                     <tr>
                       <th>الرحلة</th>

@@ -1147,8 +1147,12 @@ input[type='file'].input::file-selector-button:hover {
 
 .pagination .page-select {
   width: auto;
+  min-width: 68px;
+}
+
+.pagination .page-select .select-trigger {
   min-height: 32px;
-  padding: 4px 26px 4px 8px;
+  padding: 4px 8px;
   font-size: 13px;
   border-radius: 9px;
 }
@@ -1312,6 +1316,11 @@ input[type='file'].input::file-selector-button:hover {
   }
   .grid.cols-3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* No orphan card in the two-column fallback. */
+  .grid.cols-3 > :last-child:nth-child(odd),
+  .grid.cols-4 > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }
 
@@ -1716,4 +1725,252 @@ table.data td.name-cell {
 
 .pilgrim-card-foot .row {
   gap: 6px;
+}
+
+/* ------------------------------------------------------------ shared select */
+
+.select-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Hidden value carrier (keeps forms / change events identical). */
+.select-native {
+  position: absolute;
+  inset: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.select.select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 13px;
+  background-image: none;
+  text-align: start;
+  font: inherit;
+  font-size: 14px;
+}
+
+.select-trigger .select-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-trigger.is-placeholder .select-value {
+  color: var(--text-soft);
+}
+
+.select-trigger .select-chevron {
+  flex: 0 0 16px;
+  color: var(--text-muted);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.select-trigger.is-open {
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.select-trigger.is-open .select-chevron {
+  transform: rotate(180deg);
+}
+
+.select-trigger:disabled .select-chevron {
+  opacity: 0.5;
+}
+
+.select-menu {
+  position: fixed;
+  z-index: 200; /* above modals (100), below toasts (300) */
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: fade-in var(--dur-fast) var(--ease);
+}
+
+.select-search {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.select-search .input {
+  min-height: 36px;
+  padding-block: 6px;
+}
+
+.select-options {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.select-option.is-active {
+  background: var(--primary-soft);
+}
+
+.select-option.is-selected {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.select-option.is-placeholder {
+  color: var(--text-muted);
+}
+
+.select-option[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.select-option svg {
+  flex: 0 0 15px;
+}
+
+.select-empty {
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  text-align: center;
+}
+
+/* Phone: list tables marked .stack-on-phone become labelled stacked rows
+   (labels come from the header via lib/stackTables). */
+@media (max-width: 640px) {
+  table.data.stack-on-phone,
+  table.data.stack-on-phone tbody,
+  table.data.stack-on-phone tr,
+  table.data.stack-on-phone td {
+    display: block;
+    width: 100%;
+  }
+
+  table.data.stack-on-phone thead {
+    display: none;
+  }
+
+  table.data.stack-on-phone tbody tr {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table.data.stack-on-phone tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  /* Label floats at the start; the cell's content (which may be several
+     elements — badge + note, name + detail) flows together at the end. */
+  table.data.stack-on-phone td {
+    display: flow-root;
+    padding: 4px 0;
+    border: 0;
+    white-space: normal;
+    /* Physical side: LTR cells (numbers, dates) must still sit opposite the label. */
+    text-align: left;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  table.data.stack-on-phone td::before {
+    content: attr(data-label);
+    float: right;
+    width: 38%;
+    padding-inline-end: 12px;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  /* Cells without a header (actions) take the full row. */
+  table.data.stack-on-phone td[data-label='']::before {
+    display: none;
+  }
+
+  table.data.stack-on-phone td[data-label=''] {
+    padding-top: 8px;
+  }
+
+  table.data.stack-on-phone td[data-label=''] .row {
+    justify-content: flex-start;
+  }
+
+  /* Totals row: label and amount on one line, at opposite ends. */
+  table.data.stack-on-phone tfoot,
+  table.data.stack-on-phone tfoot tr {
+    display: block;
+  }
+
+  table.data.stack-on-phone tfoot tr {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    border-top: 2px solid var(--border-strong);
+    background: var(--surface-2);
+  }
+
+  table.data.stack-on-phone tfoot td {
+    display: block;
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  table.data.stack-on-phone tfoot td::before {
+    display: none;
+  }
+
+  table.data.stack-on-phone td.wrap {
+    min-width: 0;
+  }
+
+  table.data.stack-on-phone td .row {
+    flex-wrap: wrap;
+  }
+
+  /* Comfortable touch targets on phones (also inside tables). */
+  .btn.sm,
+  table.data td .btn {
+    min-height: 38px;
+  }
+
+  .affix-btn,
+  .icon-btn {
+    min-width: 38px;
+    min-height: 38px;
+  }
 }

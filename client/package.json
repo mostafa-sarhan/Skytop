@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "check:rtl": "node scripts/check-rtl-overflow.mjs",
+    "check:ui": "node scripts/check-ui-smoke.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

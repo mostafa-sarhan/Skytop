@@ -97,7 +97,7 @@ export const AccountsPage = () => {
           ) : (
             <>
               <div className="table-wrap">
-                <table className="data">
+                <table className="data stack-on-phone">
                   <thead>
                     <tr>
                       <th>المندوب</th>

@@ -6,6 +6,7 @@ import { Icon } from '../ui/primitives';
 import type { IconName } from '../ui/primitives';
 import { initialsOf, roleLabel } from '../lib/format';
 import { useTheme } from '../theme/useTheme';
+import { labelStackTables } from '../lib/stackTables';
 import type { User } from '../api/types';
 
 /**
@@ -87,12 +88,23 @@ export const AppLayout = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [lastPath, setLastPath] = useState(location.pathname);
   const menuRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
 
   if (lastPath !== location.pathname) {
     setLastPath(location.pathname);
     setDrawerOpen(false);
     setMenuOpen(false);
   }
+
+  // Column labels for list tables that stack into rows on phones.
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main) return undefined;
+    labelStackTables(main);
+    const observer = new MutationObserver(() => labelStackTables(main));
+    observer.observe(main, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -186,7 +198,7 @@ export const AppLayout = () => {
         </div>
       </aside>
 
-      <div className="main">
+      <div className="main" ref={mainRef}>
         <header className="topbar">
           <button
             type="button"

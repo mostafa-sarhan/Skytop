@@ -401,7 +401,7 @@ const MissingReport = ({ trips, delegates }: { trips: TripOption[]; delegates: D
               <EmptyState icon="check-circle" title="لا توجد مستندات ناقصة" description="كل المعتمرين النشطين ضمن هذا الاختيار ملفاتهم مكتملة" />
             ) : (
               <div className="table-wrap">
-                <table className="data">
+                <table className="data stack-on-phone">
                   <thead>
                     <tr>
                       <th>م</th>
@@ -528,7 +528,7 @@ const PaymentsReport = ({ delegates }: { delegates: DelegateOption[] }) => {
               <EmptyState icon="wallet" title="لا توجد دفعات في هذه الفترة" />
             ) : (
               <div className="table-wrap">
-                <table className="data">
+                <table className="data stack-on-phone">
                   <thead>
                     <tr>
                       <th>م</th>

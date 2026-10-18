@@ -269,7 +269,7 @@ export const PilgrimDetailPage = () => {
             <EmptyState icon="refresh" title="لم يُنقل هذا المعتمر بين الرحلات" />
           ) : (
             <div className="table-wrap">
-              <table className="data">
+              <table className="data stack-on-phone">
                 <thead>
                   <tr>
                     <th>التاريخ</th>

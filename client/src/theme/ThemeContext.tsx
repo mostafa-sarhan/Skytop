@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import {
-  applyTheme,
-  onSystemThemeChange,
-  readStoredTheme,
-  resolveInitialTheme,
-  storeTheme,
-} from './theme';
+import { applyTheme, resolveInitialTheme, storeTheme } from './theme';
 import type { Theme } from './theme';
 import { ThemeContext } from './useTheme';
 
@@ -17,15 +11,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
-
-  // Follow the operating system until the user picks a theme explicitly.
-  useEffect(
-    () =>
-      onSystemThemeChange((next) => {
-        if (!readStoredTheme()) setTheme(next);
-      }),
-    [],
-  );
 
   const toggleTheme = useCallback(() => {
     setTheme((current) => {

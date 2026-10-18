@@ -15,6 +15,8 @@
  *   CHECK_USER=<username> CHECK_PASSWORD=<password> npm run check:rtl
  *
  * Options (env): WIDTHS=1280,1024,390  THEMES=light,dark  CHROME_PATH=...  SELF_TEST=1
+ *   ROUTES=all  → every page reachable from the UI (plus /login logged out),
+ *                 with real ids taken from the API
  * SELF_TEST=1 injects elements past both edges to prove detection works.
  */
 import { spawn } from 'node:child_process';
@@ -61,6 +63,41 @@ if (busiest) {
     pages.push(['delegate', `/delegates/${assignment.delegate.id}`]);
     pages.push(['workspace', `/delegates/${assignment.delegate.id}/trips/${busiest.id}/pilgrims`]);
   }
+}
+if (process.env.ROUTES === 'all') {
+  const first = async (p) => (await get(p))?.items?.[0];
+  const openTrip = trips.find((t) => t.status === 'OPEN') ?? trips[0];
+  const doneTrip = trips.find((t) => t.status === 'COMPLETED');
+  const pilgrim = await first('/pilgrims?pageSize=1');
+  const cancelled = await first('/pilgrims?status=CANCELLED&pageSize=1');
+  const account = await first('/finance/delegates?pageSize=1');
+  const expense = await first('/expenses?pageSize=1');
+  const add = (name, route) => route && pages.push([name, route]);
+  add('trips', '/trips');
+  add('trip-open', openTrip && `/trips/${openTrip.id}`);
+  add('trip-completed', doneTrip && `/trips/${doneTrip.id}`);
+  add('trips-new', '/trips?new=1');
+  add('delegates', '/delegates');
+  add('delegates-new', '/delegates?new=1');
+  add('pilgrim', pilgrim && `/pilgrims/${pilgrim.id}`);
+  add('pilgrim-cancelled', cancelled && `/pilgrims/${cancelled.id}`);
+  add('pilgrim-new', '/pilgrims/new');
+  add('pilgrim-edit', pilgrim && `/pilgrims/${pilgrim.id}/edit`);
+  add('accounts', '/accounts');
+  add('account', account && `/accounts/${account.id}`);
+  add('account-payment', account && `/accounts/${account.id}/payments/new`);
+  add('payments', '/payments');
+  add('payment-new', '/payments/new');
+  add('movements', '/finance/movements');
+  add('adjustments', '/finance/adjustments');
+  add('expenses', '/expenses');
+  add('expense-new', '/expenses/new');
+  add('expense', expense && `/expenses/${expense.id}`);
+  for (const tab of ['trip', 'delegate-trip', 'missing', 'statement', 'payments']) add(`reports-${tab}`, `/reports?tab=${tab}`);
+  add('users', '/users');
+  add('audit', '/audit');
+  add('profile', '/profile');
+  pages.push(['login (logged out)', '/login', { loggedOut: true }]);
 }
 for (const extra of (process.env.EXTRA_PAGES ?? '').split(',').filter(Boolean)) pages.push([extra, extra]);
 
@@ -148,14 +185,15 @@ try {
   for (const theme of THEMES) {
     for (const width of WIDTHS) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 });
-      for (const [name, route] of pages) {
+      for (const [name, route, opts = {}] of pages) {
+        if (opts.loggedOut) await send('Network.clearBrowserCookies');
         await send('Page.navigate', { url: `${APP}${route}` });
         await sleep(200);
         await evaluate(`localStorage.setItem('skytop-theme', '${theme}')`);
         await send('Page.navigate', { url: `${APP}${route}` });
         // Wait until the page header is rendered and no spinner/skeleton is left.
         for (let i = 0, stable = 0; i < 150 && stable < 6; i += 1) {
-          const busy = await evaluate(`!document.querySelector('.page-header') || !!document.querySelector('.spinner, .loading-row, .skeleton')`);
+          const busy = await evaluate(`!document.querySelector('.page-header, .login-card') || !!document.querySelector('.spinner, .loading-row, .skeleton')`);
           stable = busy ? 0 : stable + 1;
           await sleep(60);
         }
@@ -170,6 +208,7 @@ try {
         if (contentWidth > scan.vw + 1) problems.push(`layout content width ${contentWidth} > ${scan.vw}`);
         if (scan.elements.length) problems.push(`elements outside the viewport: ${scan.elements.join(' | ')}`);
         checks += 1;
+        if (opts.loggedOut) await send('Network.setCookie', { name: cookie.split('=')[0], value: cookie.split('=').slice(1).join('='), url: APP, httpOnly: true });
         const label = `${name} @${width}px ${theme}`;
         if (problems.length) failures.push(`${label}: ${problems.join('; ')}`);
         console.log(`${problems.length ? 'FAIL' : 'PASS'}  ${label}${problems.length ? `  — ${problems.join('; ')}` : ''}`);

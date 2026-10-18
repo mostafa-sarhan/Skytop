@@ -264,7 +264,7 @@ export const UsersPage = () => {
         {error ? <EmptyState title="تعذر تحميل المستخدمين" /> : null}
         {data ? (
           <div className="table-wrap">
-            <table className="data">
+            <table className="data stack-on-phone">
               <thead>
                 <tr>
                   <th>الاسم</th>

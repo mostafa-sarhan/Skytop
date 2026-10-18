@@ -128,7 +128,7 @@ export const AccountBreakdown = ({ trips, summary }: { trips: AccountTripRow[]; 
     : `+ ${money(summary.correctionsNet)}`;
   return (
     <div className="table-wrap">
-      <table className="data">
+      <table className="data stack-on-phone">
         <thead>
           <tr>
             <th>الرحلة</th>
@@ -202,7 +202,7 @@ export const AccountPaymentsTable = ({
   );
   return (
     <div className="table-wrap">
-      <table className="data">
+      <table className="data stack-on-phone">
         <thead>
           <tr>
             <th>تاريخ الدفع</th>
@@ -276,7 +276,7 @@ export const AccountAdjustmentsTable = ({ adjustments }: { adjustments: AccountA
     <EmptyState title="لا توجد تسويات" description="لم تُسجَّل أي تسوية أو استرداد لهذا المندوب" />
   ) : (
     <div className="table-wrap">
-      <table className="data">
+      <table className="data stack-on-phone">
         <thead>
           <tr>
             <th>التاريخ</th>

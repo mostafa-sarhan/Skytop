@@ -89,7 +89,7 @@ export const AuditPage = () => {
           ) : (
             <>
               <div className="table-wrap">
-                <table className="data">
+                <table className="data stack-on-phone">
                   <thead>
                     <tr>
                       <th>التاريخ</th>

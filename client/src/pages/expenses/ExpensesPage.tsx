@@ -242,7 +242,7 @@ export const ExpensesPage = () => {
                 <span className="muted small">{formatCount(list.data.meta.total)} سجل</span>
               </div>
               <div className={`table-wrap${list.loading ? ' is-refreshing' : ''}`}>
-                <table className="data">
+                <table className="data stack-on-phone">
                   <thead>
                     <tr>
                       <th>التاريخ</th>

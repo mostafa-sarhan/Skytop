@@ -4,7 +4,9 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { FieldContext } from './fieldContext';
+import { Select } from './Select';
 import { Link } from 'react-router-dom';
 
 export type IconName =
@@ -245,16 +247,22 @@ export const Field = ({
   hint?: string;
   children: ReactNode;
   className?: string;
-}) => (
-  <div className={`field ${className}`}>
-    <label>
-      {label} {required ? <span className="required">*</span> : null}
-    </label>
-    {children}
-    {error ? <span className="error">{error}</span> : null}
-    {!error && hint ? <span className="hint">{hint}</span> : null}
-  </div>
-);
+}) => {
+  // The label id names custom controls (e.g. the shared select) for screen readers.
+  const labelId = useId();
+  return (
+    <FieldContext.Provider value={{ labelId, invalid: Boolean(error) }}>
+      <div className={`field ${className}`}>
+        <label id={labelId}>
+          {label} {required ? <span className="required">*</span> : null}
+        </label>
+        {children}
+        {error ? <span className="error">{error}</span> : null}
+        {!error && hint ? <span className="hint">{hint}</span> : null}
+      </div>
+    </FieldContext.Provider>
+  );
+};
 
 export const TextInput = ({
   invalid,
@@ -267,18 +275,9 @@ export const TextInput = ({
   />
 );
 
-export const SelectInput = ({
-  invalid,
-  children,
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean }) => (
-  <select
-    {...props}
-    className={`select${props.className ? ` ${props.className}` : ''}`}
-    aria-invalid={invalid || undefined}
-  >
-    {children}
-  </select>
+/** The shared dropdown (see ui/Select.tsx); same props as a native <select>. */
+export const SelectInput = (props: SelectHTMLAttributes<HTMLSelectElement> & { invalid?: boolean; searchable?: boolean }) => (
+  <Select {...props} />
 );
 
 export const TextArea = ({
@@ -409,8 +408,8 @@ export const Pagination = ({
       >
         <Icon name="arrow-right" size={14} /> السابق
       </button>
-      <select
-        className="select page-select"
+      <Select
+        className="page-select"
         value={page}
         onChange={(event) => onPage(Number(event.target.value))}
         aria-label="رقم الصفحة"
@@ -420,7 +419,7 @@ export const Pagination = ({
             {value}
           </option>
         ))}
-      </select>
+      </Select>
       <button
         type="button"
         className="btn secondary sm"

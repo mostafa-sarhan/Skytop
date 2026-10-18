@@ -10,7 +10,7 @@
       html[data-theme='dark'] { background: #13111b; color-scheme: dark; }
     </style>
     <script>
-      // Apply the saved theme (or the OS preference) before the first paint to
+      // Apply the saved theme (or the dark default) before the first paint to
       // avoid a light/dark flash. Mirrors resolveInitialTheme() in
       // src/theme/theme.ts — keep the storage key in sync.
       (function () {
@@ -19,7 +19,7 @@
           theme = localStorage.getItem('skytop-theme');
         } catch (e) {}
         if (theme !== 'light' && theme !== 'dark') {
-          theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          theme = 'dark'; // product default; the OS preference is not used
         }
         document.documentElement.setAttribute('data-theme', theme);
         if (theme === 'dark') {
