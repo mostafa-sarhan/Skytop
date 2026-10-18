@@ -247,6 +247,7 @@ export const PaymentCreatePage = () => {
                       onChange={(event) => setAmount(event.target.value)}
                       dir="ltr"
                       inputMode="decimal"
+                      latinDigits
                       placeholder="0.00"
                     />
                   </Field>
@@ -259,6 +260,7 @@ export const PaymentCreatePage = () => {
                     <TextInput
                       value={receiptNumber}
                       onChange={(event) => setReceiptNumber(event.target.value)}
+                      latinDigits
                       dir="ltr"
                       maxLength={40}
                     />
@@ -298,6 +300,7 @@ export const PaymentCreatePage = () => {
                         <TextInput
                           value={referenceNumber}
                           onChange={(event) => setReferenceNumber(event.target.value)}
+                          latinDigits
                           dir="ltr"
                         />
                       </Field>

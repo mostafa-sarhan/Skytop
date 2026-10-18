@@ -135,7 +135,11 @@ export const ExpenseDetailPage = () => {
           <div className="card-body">
             <dl className="kv">
               <dt>المبلغ</dt>
-              <dd className={`mono${voided ? ' strike' : ''}`}>{formatAmount(e.amount)} جنيه</dd>
+              <dd className={voided ? 'strike' : undefined}>
+                <span className="money">
+                  <span className="mono-inline">{formatAmount(e.amount)}</span> جنيه
+                </span>
+              </dd>
               <dt>التصنيف</dt>
               <dd>{expenseCategoryLabel[e.category]}</dd>
               <dt>تاريخ المصروف</dt>

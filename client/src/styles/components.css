@@ -212,6 +212,27 @@ table.data th.wrap {
   min-width: 200px;
 }
 
+/* A value with a secondary line (why a payment was voided, transfer type +
+   reference...): the secondary line wraps instead of stretching the column. */
+table.data td.note-cell {
+  white-space: normal;
+  min-width: 120px;
+  max-width: 240px;
+}
+
+/* Narrower desktops / tablets: tighter cells so wide tables fit. */
+@media (max-width: 1366px) {
+  table.data th,
+  table.data td {
+    padding: 11px 12px;
+  }
+
+  table.data td.wrap,
+  table.data th.wrap {
+    min-width: 160px;
+  }
+}
+
 table.data tbody tr {
   transition: background var(--dur-fast) var(--ease);
 }
@@ -224,15 +245,31 @@ table.data tbody tr:last-child td {
   border-bottom: none;
 }
 
+/* Values sit on the same side as their header. `.mono` cells keep LTR
+   content order (dates, receipt / reference numbers) but must not flip their
+   alignment to the LTR side, so sides are physical here (the app is RTL):
+   text columns align right, numeric (.num) columns align left. */
+table.data td.mono,
+table.data th.mono {
+  text-align: right;
+}
+
 table.data td.num,
 table.data th.num {
-  text-align: end;
+  text-align: left;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
 }
 
 table.data td .row {
   gap: 4px;
+}
+
+/* Several actions / badges in one cell may stack when space is short, rather
+   than forcing the table wider than its card. */
+table.data td .row-actions,
+table.data td .row {
+  flex-wrap: wrap;
 }
 
 table.data td .btn {
@@ -768,6 +805,20 @@ input[type='file'].input::file-selector-button:hover {
 .tab.active .tab-count {
   background: var(--brand-100);
   color: var(--brand-700);
+}
+
+/* Phones: tabs wrap instead of hiding off-screen (no scrollbar is shown). */
+@media (max-width: 640px) {
+  .tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 2px;
+  }
+
+  .tab {
+    padding: 9px 8px;
+    gap: 6px;
+  }
 }
 
 /* ------------------------------------------------------------------ alerts */
@@ -1882,8 +1933,26 @@ table.data td.name-cell {
   }
 
   table.data.stack-on-phone tbody tr {
+    display: flex;
+    flex-direction: column;
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);
+  }
+
+  /* The identifying field (name, receipt number...) leads the card. A name
+     or title needs no label; a bare number (receipt) keeps it. */
+  table.data.stack-on-phone td.primary-cell {
+    order: -1;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  table.data.stack-on-phone td.primary-cell:not(.mono) {
+    text-align: right;
+  }
+
+  table.data.stack-on-phone td.primary-cell:not(.mono)::before {
+    display: none;
   }
 
   table.data.stack-on-phone tbody tr:last-child {
@@ -1900,6 +1969,7 @@ table.data td.name-cell {
     /* Physical side: LTR cells (numbers, dates) must still sit opposite the label. */
     text-align: left;
     min-width: 0;
+    max-width: none;
     overflow-wrap: anywhere;
   }
 
@@ -1972,5 +2042,224 @@ table.data td.name-cell {
   .icon-btn {
     min-width: 38px;
     min-height: 38px;
+  }
+}
+
+/* Amount + currency (see Money): never split across lines. */
+.money {
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------- account cards */
+
+/* Desktop: the accounts table. Tablets / phones: compact cards instead. */
+.account-cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 12px;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .accounts-table {
+    display: none;
+  }
+
+  .account-cards {
+    display: grid;
+  }
+}
+
+@media (max-width: 640px) {
+  .account-cards {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 10px;
+    gap: 10px;
+  }
+}
+
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.account-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.account-card-id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.account-card-name {
+  font-weight: 700;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.account-card-balance {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.account-card-balance .balance-pill {
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+.account-card-figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.account-card-figures dt {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.account-card-figures dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.account-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------ tablet card grid */
+
+/* Tablets: wide list tables become cards with a compact grid of fields
+   (label above value), so nothing needs sideways scrolling. The identifying
+   field leads the card; actions (header-less column) close it. */
+@media (min-width: 641px) and (max-width: 900px) {
+  table.data.stack-on-tablet,
+  table.data.stack-on-tablet tbody,
+  table.data.stack-on-tablet tfoot {
+    display: block;
+    width: 100%;
+  }
+
+  table.data.stack-on-tablet thead {
+    display: none;
+  }
+
+  table.data.stack-on-tablet tbody tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 20px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table.data.stack-on-tablet tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  table.data.stack-on-tablet td {
+    display: block;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+    max-width: none;
+    white-space: normal;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  table.data.stack-on-tablet td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  table.data.stack-on-tablet td.primary-cell {
+    grid-column: 1 / -1;
+    order: -1;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  table.data.stack-on-tablet td.primary-cell:not(.mono)::before {
+    display: none;
+  }
+
+  table.data.stack-on-tablet td[data-label=''] {
+    grid-column: 1 / -1;
+  }
+
+  table.data.stack-on-tablet td[data-label='']::before {
+    display: none;
+  }
+
+  table.data.stack-on-tablet td[data-label=''] .row,
+  table.data.stack-on-tablet td[data-label=''] .row-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  table.data.stack-on-tablet td .row {
+    flex-wrap: wrap;
+  }
+
+  table.data.stack-on-tablet tfoot tr {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+    border-top: 2px solid var(--border-strong);
+    background: var(--surface-2);
+  }
+
+  table.data.stack-on-tablet tfoot td {
+    width: auto;
+    background: transparent;
+  }
+
+  table.data.stack-on-tablet tfoot td::before {
+    display: none;
+  }
+
+  /* Pilgrim lists switch to cards here too (see CARDS_QUERY): two per row. */
+  .pilgrim-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .pilgrim-card,
+  .pilgrim-card:last-child {
+    border: 1px solid var(--border);
+    border-radius: 12px;
   }
 }

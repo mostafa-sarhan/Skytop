@@ -18,6 +18,15 @@
  *   ROUTES=all  → every page reachable from the UI (plus /login logged out),
  *                 with real ids taken from the API
  * SELF_TEST=1 injects elements past both edges to prove detection works.
+ *
+ * Tables (every visible table.data on every page):
+ *   - each value sits on the same side of its column as its header (measured
+ *     from what is actually drawn, so RTL/LTR mix-ups show up)
+ *   - every body row has as many columns as the header (no shifted rows)
+ *   - phone card layout: no value or action is hidden or pushed off screen
+ *   - no table that needs sideways scrolling (at any width, or only up to
+ *     SCROLL_MAX_WIDTH=<px>), unless the wrapper is marked data-scroll-ok as
+ *     an intentional, explained exception
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -32,6 +41,8 @@ const WIDTHS = (process.env.WIDTHS ?? '1280,1024,390').split(',').map(Number);
 const THEMES = (process.env.THEMES ?? 'light,dark').split(',');
 const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const SELF_TEST = process.env.SELF_TEST === '1';
+// Tables must not need sideways scrolling at or below this width (default: any width).
+const SCROLL_MAX_WIDTH = Number(process.env.SCROLL_MAX_WIDTH ?? 100000);
 const PORT = 9400 + Math.floor(Math.random() * 400);
 
 if (!USER || !PASSWORD) {
@@ -93,7 +104,15 @@ if (process.env.ROUTES === 'all') {
   add('expenses', '/expenses');
   add('expense-new', '/expenses/new');
   add('expense', expense && `/expenses/${expense.id}`);
-  for (const tab of ['trip', 'delegate-trip', 'missing', 'statement', 'payments']) add(`reports-${tab}`, `/reports?tab=${tab}`);
+  for (const tab of ['missing', 'payments']) add(`reports-${tab}`, `/reports?tab=${tab}`);
+  // Report tabs that need a selection before they show their table / preview.
+  const busiestDetail = busiest ? await get(`/trips/${busiest.id}`) : null;
+  const busiestDelegate = [...(busiestDetail?.delegates ?? [])].sort((a, b) => (b.pilgrimCount ?? 0) - (a.pilgrimCount ?? 0))[0];
+  if (busiest) pages.push(['reports-trip', '/reports?tab=trip', { pick: [['الرحلة', busiest.id]] }]);
+  if (busiest && busiestDelegate) {
+    pages.push(['reports-delegate-trip', '/reports?tab=delegate-trip', { pick: [['الرحلة', busiest.id], ['المندوب', busiestDelegate.delegate.id]] }]);
+  }
+  if (account) pages.push(['reports-statement', '/reports?tab=statement', { pick: [['المندوب', account.id]] }]);
   add('users', '/users');
   add('audit', '/audit');
   add('profile', '/profile');
@@ -175,6 +194,120 @@ const SCAN = `(() => {
   return { scrollWidth: document.documentElement.scrollWidth, vw, elements: out };
 })()`;
 
+/** Runs in the page: header/value alignment, shifted rows, hidden card values. */
+const TABLES = `(() => {
+  const vw = document.documentElement.clientWidth;
+  const out = [];
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.display !== 'none' && cs.visibility !== 'hidden';
+  };
+  // Horizontal extent of what is actually drawn: text runs, icons/images, and
+  // boxed items (badges, buttons) as whole boxes — their dot/padding would
+  // otherwise make the text inside look off-side.
+  const BOX = '.badge, .btn, button, input';
+  const drawn = (cell) => {
+    let l = Infinity;
+    let r = -Infinity;
+    const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      let rects = [];
+      if (n.nodeType === 3) {
+        if (!n.textContent.trim() || n.parentElement.closest('select') || n.parentElement.closest(BOX)) continue;
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        rects = [...range.getClientRects()];
+      } else if (n.matches(BOX) && !n.parentElement.closest(BOX)) {
+        rects = [n.getBoundingClientRect()];
+      } else if (['svg', 'img'].includes(n.tagName.toLowerCase()) && !n.closest(BOX)) {
+        rects = [n.getBoundingClientRect()];
+      }
+      for (const b of rects) {
+        if (b.width === 0) continue;
+        l = Math.min(l, b.left);
+        r = Math.max(r, b.right);
+      }
+    }
+    return l === Infinity ? null : { l, r };
+  };
+  // Which side of its cell the content sits on (null when it fills the cell).
+  const side = (cell) => {
+    const box = drawn(cell);
+    if (!box) return null;
+    const cs = getComputedStyle(cell);
+    const cr = cell.getBoundingClientRect();
+    const gl = box.l - (cr.left + parseFloat(cs.paddingLeft));
+    const gr = cr.right - parseFloat(cs.paddingRight) - box.r;
+    if (gl < 6 && gr < 6) return null;
+    if (Math.abs(gl - gr) < 4) return 'center';
+    return gr < gl ? 'right' : 'left';
+  };
+  document.querySelectorAll('table.data').forEach((table, index) => {
+    if (!visible(table)) return;
+    const name = (table.closest('.card')?.querySelector('.card-header h3, .card-header h2')?.textContent.trim() || (document.querySelector('.page-header h1')?.textContent.trim() ?? 'table') + ' #' + (index + 1)).slice(0, 40);
+    const firstRow = table.querySelector('tbody tr');
+    const headRow = table.querySelector('thead tr');
+    const stacked = (firstRow && getComputedStyle(firstRow).display === 'block') || (headRow && !visible(headRow));
+    if (stacked) {
+      for (const cell of table.querySelectorAll('tbody td, tfoot td')) {
+        if (!cell.textContent.trim() && !cell.querySelector('a, button, svg, img')) continue;
+        const r = cell.getBoundingClientRect();
+        if (!visible(cell) || r.left < -1 || r.right > vw + 1) {
+          out.push(name + ': card value hidden or off screen «' + (cell.dataset.label || cell.textContent.trim().slice(0, 20)) + '»');
+          break;
+        }
+      }
+      return;
+    }
+    if (!headRow) return;
+    const heads = [];
+    for (const th of headRow.cells) for (let i = 0; i < th.colSpan; i += 1) heads.push(th.colSpan === 1 ? th : null);
+    const mismatched = new Map();
+    for (const row of table.querySelectorAll('tbody tr, tfoot tr')) {
+      let span = 0;
+      for (const cell of row.cells) span += cell.colSpan;
+      if (row.cells.length > 1 && span !== heads.length) {
+        out.push(name + ': a row has ' + span + ' columns under ' + heads.length + ' headers');
+        break;
+      }
+      let col = 0;
+      for (const cell of row.cells) {
+        const th = cell.colSpan === 1 ? heads[col] : null;
+        col += cell.colSpan;
+        const label = th?.textContent.trim();
+        if (!label) continue;
+        const hs = side(th);
+        const vs = side(cell);
+        if (hs && vs && hs !== vs && !mismatched.has(label)) {
+          mismatched.set(label, 'header ' + hs + ', value ' + vs + ' (e.g. «' + cell.textContent.trim().slice(0, 24) + '»)');
+        }
+      }
+    }
+    for (const [label, detail] of mismatched) out.push(name + ': «' + label + '» ' + detail);
+  });
+  if (vw <= ${SCROLL_MAX_WIDTH}) {
+    for (const wrap of document.querySelectorAll('.table-wrap')) {
+      if (!visible(wrap) || wrap.closest('[data-scroll-ok]')) continue;
+      if (wrap.scrollWidth > wrap.clientWidth + 2) {
+        const title = wrap.closest('.card')?.querySelector('.card-header h3')?.textContent.trim() ?? document.querySelector('.page-header h1')?.textContent.trim() ?? '?';
+        out.push('table needs sideways scrolling: ' + title.slice(0, 40) + ' (+' + (wrap.scrollWidth - wrap.clientWidth) + 'px)');
+      }
+    }
+  }
+  return out;
+})()`;
+
+/** Picks a value in the (shared) select of the field labelled `label`. */
+const pick = (label, value) => `(() => {
+  const field = [...document.querySelectorAll('.field')].find((f) => f.querySelector('label')?.textContent.includes(${JSON.stringify(label)}));
+  const select = field?.querySelector('select');
+  if (!select || ![...select.options].some((o) => o.value === ${JSON.stringify(value)})) return false;
+  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, ${JSON.stringify(value)});
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+})()`;
+
 const failures = [];
 let checks = 0;
 try {
@@ -192,10 +325,21 @@ try {
         await evaluate(`localStorage.setItem('skytop-theme', '${theme}')`);
         await send('Page.navigate', { url: `${APP}${route}` });
         // Wait until the page header is rendered and no spinner/skeleton is left.
-        for (let i = 0, stable = 0; i < 150 && stable < 6; i += 1) {
-          const busy = await evaluate(`!document.querySelector('.page-header, .login-card') || !!document.querySelector('.spinner, .loading-row, .skeleton')`);
-          stable = busy ? 0 : stable + 1;
-          await sleep(60);
+        const settle = async () => {
+          for (let i = 0, stable = 0; i < 150 && stable < 6; i += 1) {
+            const busy = await evaluate(`!document.querySelector('.page-header, .login-card') || !!document.querySelector('.spinner, .loading-row, .skeleton')`);
+            stable = busy ? 0 : stable + 1;
+            await sleep(60);
+          }
+        };
+        await settle();
+        for (const [label, value] of opts.pick ?? []) {
+          let picked = false;
+          for (let i = 0; i < 80 && !picked; i += 1) {
+            picked = await evaluate(pick(label, value));
+            if (!picked) await sleep(100);
+          }
+          await settle();
         }
         if (SELF_TEST) {
           await evaluate(`(() => { const page = document.querySelector('.page'); page.style.position = 'relative'; for (const side of ['left', 'right']) { const d = document.createElement('div'); d.textContent = 'self-test ' + side; d.style.cssText = 'position:absolute;top:0;width:300px;height:20px;' + side + ':-500px'; page.appendChild(d); } })()`);
@@ -207,6 +351,10 @@ try {
         if (scan.scrollWidth > scan.vw + 1) problems.push(`document scrollWidth ${scan.scrollWidth} > ${scan.vw}`);
         if (contentWidth > scan.vw + 1) problems.push(`layout content width ${contentWidth} > ${scan.vw}`);
         if (scan.elements.length) problems.push(`elements outside the viewport: ${scan.elements.join(' | ')}`);
+        if (!SELF_TEST) {
+          const tables = await evaluate(TABLES);
+          if (tables.length) problems.push(`tables: ${tables.join(' | ')}`);
+        }
         checks += 1;
         if (opts.loggedOut) await send('Network.setCookie', { name: cookie.split('=')[0], value: cookie.split('=').slice(1).join('='), url: APP, httpOnly: true });
         const label = `${name} @${width}px ${theme}`;

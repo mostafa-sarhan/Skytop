@@ -151,7 +151,7 @@ export const DelegateDetailPage = () => {
             ) : null}
             {trips.data && trips.data.length > 0 ? (
               <div className="table-wrap">
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
                       <th>الرحلة</th>
@@ -166,7 +166,7 @@ export const DelegateDetailPage = () => {
                   <tbody>
                     {trips.data.map((trip) => (
                       <tr key={trip.tripId}>
-                        <td>
+                        <td className="primary-cell">
                           <Link to={workspace(trip.tripId)}>
                             <strong>{trip.name}</strong>
                           </Link>

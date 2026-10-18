@@ -14,7 +14,7 @@ import {
   Tabs,
   TextInput,
 } from '../../ui/primitives';
-import { AccountStatusBadge } from '../../components/DelegateAccount';
+import { AccountStatusBadge, Money } from '../../components/DelegateAccount';
 
 const TABS: Array<{ id: '' | AccountStatus; label: string }> = [
   { id: '', label: 'الكل' },
@@ -96,12 +96,11 @@ export const AccountsPage = () => {
             <EmptyState title={accountStatus || list.debouncedSearch ? 'لا توجد حسابات مطابقة' : 'لا توجد حسابات'} />
           ) : (
             <>
-              <div className="table-wrap">
-                <table className="data stack-on-phone">
+              <div className="table-wrap accounts-table">
+                <table className="data">
                   <thead>
                     <tr>
                       <th>المندوب</th>
-                      <th>الهاتف</th>
                       <th className="num">إجمالي المطلوب</th>
                       <th className="num">إجمالي المدفوع</th>
                       <th className="num">المتبقي عليه</th>
@@ -118,8 +117,10 @@ export const AccountsPage = () => {
                           <Link to={`/accounts/${row.id}`}>
                             <strong>{row.name}</strong>
                           </Link>
+                          <div className="muted small">
+                            <span className="mono-inline">{row.phone}</span>
+                          </div>
                         </td>
-                        <td className="mono">{row.phone}</td>
                         <td className="num mono">{formatAmount(row.account.totalRequired)}</td>
                         <td className="num mono">{formatAmount(row.account.totalPaid)}</td>
                         <td className="num mono">
@@ -150,11 +151,70 @@ export const AccountsPage = () => {
                   </tbody>
                 </table>
               </div>
+              {/* Tablets / phones: one compact card per delegate (same figures). */}
+              <ul className="account-cards">
+                {data.items.map((row) => (
+                  <AccountCard key={row.id} row={row} />
+                ))}
+              </ul>
               <Pagination {...data.meta} onPage={list.setPage} />
             </>
           )
         ) : null}
       </div>
     </div>
+  );
+};
+
+/** The balance that matters for this account: owed, credit, or settled. */
+const mainBalance = (account: DelegateAccountList['items'][number]['account']) =>
+  account.status === 'CREDIT'
+    ? { label: 'له رصيد', value: account.credit, tone: 'credit' }
+    : account.status === 'DUE'
+      ? { label: 'المتبقي عليه', value: account.remaining, tone: 'debt' }
+      : { label: 'المتبقي عليه', value: account.remaining, tone: 'settled' };
+
+const AccountCard = ({ row }: { row: DelegateAccountList['items'][number] }) => {
+  const balance = mainBalance(row.account);
+  return (
+    <li className="account-card">
+      <div className="account-card-head">
+        <div className="account-card-id">
+          <Link to={`/accounts/${row.id}`} className="account-card-name">
+            {row.name}
+          </Link>
+          <span className="muted small mono-inline">{row.phone}</span>
+        </div>
+        <AccountStatusBadge status={row.account.status} />
+      </div>
+      <div className="account-card-balance">
+        <span className="muted small">{balance.label}</span>
+        <span className={`balance-pill ${balance.tone}`}>
+          <Money value={balance.value} />
+        </span>
+      </div>
+      <dl className="account-card-figures">
+        <div>
+          <dt>إجمالي المطلوب</dt>
+          <dd>
+            <span className="mono-inline">{formatAmount(row.account.totalRequired)}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>إجمالي المدفوع</dt>
+          <dd>
+            <span className="mono-inline">{formatAmount(row.account.totalPaid)}</span>
+          </dd>
+        </div>
+      </dl>
+      <div className="account-card-foot">
+        <span className="muted small">
+          آخر دفعة: <span className="mono-inline">{row.lastPaymentDate ? formatDate(row.lastPaymentDate) : 'لا توجد'}</span>
+        </span>
+        <Link className="btn secondary sm" to={`/accounts/${row.id}`}>
+          <Icon name="eye" size={14} /> عرض الحساب
+        </Link>
+      </div>
+    </li>
   );
 };

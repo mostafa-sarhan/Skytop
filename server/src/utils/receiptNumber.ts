@@ -2,15 +2,11 @@
  * Physical paper receipt numbers are entered by employees from the company's
  * receipt books. The application never generates them.
  */
+import { toWesternDigits } from './digits';
 
-const DIGIT_MAP: Record<string, string> = {};
-'٠١٢٣٤٥٦٧٨٩'.split('').forEach((d, i) => (DIGIT_MAP[d] = String(i)));
-'۰۱۲۳۴۵۶۷۸۹'.split('').forEach((d, i) => (DIGIT_MAP[d] = String(i)));
-
-/** Display form: Arabic-Indic digits → Latin digits, trimmed, single spaces. */
+/** Display form: Arabic-Indic / Persian digits → Latin digits, trimmed, single spaces. */
 export const normalizeReceiptNumber = (raw: string): string =>
-  raw
-    .replace(/[٠-٩۰-۹]/g, (d) => DIGIT_MAP[d] ?? d)
+  toWesternDigits(raw)
     .trim()
     .replace(/\s+/g, ' ');
 

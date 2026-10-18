@@ -228,7 +228,7 @@ export const TripsPage = () => {
           ) : (
             <>
               <div className="table-wrap">
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
                       <th>اسم الرحلة</th>
@@ -244,7 +244,7 @@ export const TripsPage = () => {
                   <tbody>
                     {data.items.map((trip) => (
                       <tr key={trip.id} style={trip.phase === 'FINISHED' ? { opacity: 0.75 } : undefined}>
-                        <td>
+                        <td className="primary-cell">
                           <Link to={`/trips/${trip.id}`}>
                             <strong>{trip.name}</strong>
                           </Link>

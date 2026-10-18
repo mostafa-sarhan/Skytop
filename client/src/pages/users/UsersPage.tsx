@@ -264,7 +264,7 @@ export const UsersPage = () => {
         {error ? <EmptyState title="تعذر تحميل المستخدمين" /> : null}
         {data ? (
           <div className="table-wrap">
-            <table className="data stack-on-phone">
+            <table className="data stack-on-phone stack-on-tablet">
               <thead>
                 <tr>
                   <th>الاسم</th>
@@ -278,7 +278,7 @@ export const UsersPage = () => {
               <tbody>
                 {data.items.map((user) => (
                   <tr key={user.id}>
-                    <td>
+                    <td className="primary-cell">
                       <strong>{user.fullName}</strong>
                       {me?.id === user.id ? <Badge tone="primary">أنت</Badge> : null}
                     </td>

@@ -215,7 +215,7 @@ export const PilgrimDetailPage = () => {
                   <strong>{data.delegate.name}</strong>
                 </Link>
                 {data.delegate.phone ? (
-                  <div className="mono muted small" dir="ltr" style={{ textAlign: 'right' }}>
+                  <div className="mono muted small">
                     {data.delegate.phone}
                   </div>
                 ) : null}
@@ -269,7 +269,7 @@ export const PilgrimDetailPage = () => {
             <EmptyState icon="refresh" title="لم يُنقل هذا المعتمر بين الرحلات" />
           ) : (
             <div className="table-wrap">
-              <table className="data stack-on-phone">
+              <table className="data stack-on-phone stack-on-tablet">
                 <thead>
                   <tr>
                     <th>التاريخ</th>

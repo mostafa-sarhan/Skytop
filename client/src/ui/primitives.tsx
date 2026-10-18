@@ -6,6 +6,7 @@ import type {
 } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { FieldContext } from './fieldContext';
+import { toWesternDigits } from '../lib/digits';
 import { Select } from './Select';
 import { Link } from 'react-router-dom';
 
@@ -264,12 +265,33 @@ export const Field = ({
   );
 };
 
+/**
+ * `latinDigits`: financial fields (amounts, receipt and reference numbers)
+ * turn typed Arabic-Indic / Persian digits into 0-9 as the user types.
+ */
 export const TextInput = ({
   invalid,
+  latinDigits,
+  onChange,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) => (
+}: InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean; latinDigits?: boolean }) => (
   <input
     {...props}
+    onChange={
+      latinDigits && onChange
+        ? (event) => {
+            const input = event.target;
+            const western = toWesternDigits(input.value);
+            if (western !== input.value) {
+              // Same length (one digit for one digit), so the caret can stay put.
+              const caret = input.selectionStart;
+              input.value = western;
+              if (caret !== null) input.setSelectionRange(caret, caret);
+            }
+            onChange(event);
+          }
+        : onChange
+    }
     className={`input${props.className ? ` ${props.className}` : ''}`}
     aria-invalid={invalid || undefined}
   />

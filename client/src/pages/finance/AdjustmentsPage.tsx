@@ -125,6 +125,7 @@ const AdjustmentModal = ({
             onChange={(event) => setAmount(event.target.value)}
             dir="ltr"
             inputMode="decimal"
+            latinDigits
             placeholder="0.00"
           />
         </Field>
@@ -209,7 +210,7 @@ export const AdjustmentsPage = () => {
           ) : (
             <>
               <div className="table-wrap">
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
                       <th>التاريخ</th>
@@ -227,12 +228,10 @@ export const AdjustmentsPage = () => {
                       <tr key={row.id}>
                         <td className="mono">{formatDate(row.effectiveDate)}</td>
                         <td>
-                          <Badge tone={row.type === 'REFUND' ? 'info' : 'warning'}>
-                            {adjustmentTypeLabel[row.type]}
-                            {row.direction ? ` — ${adjustmentDirectionLabel[row.direction]}` : ''}
-                          </Badge>
+                          <Badge tone={row.type === 'REFUND' ? 'info' : 'warning'}>{adjustmentTypeLabel[row.type]}</Badge>
+                          {row.direction ? <div className="muted small">{adjustmentDirectionLabel[row.direction]}</div> : null}
                         </td>
-                        <td>{row.delegate.name}</td>
+                        <td className="primary-cell">{row.delegate.name}</td>
                         <td className="num mono">
                           <strong>{formatAmount(row.amount)}</strong>
                         </td>

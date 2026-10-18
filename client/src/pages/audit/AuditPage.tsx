@@ -64,6 +64,7 @@ export const AuditPage = () => {
                 value={list.search}
                 onChange={(event) => list.setSearch(event.target.value)}
                 placeholder="اسم، رقم إيصال، سبب..."
+                latinDigits
               />
             </Field>
             <Field label="نوع العملية">
@@ -89,7 +90,7 @@ export const AuditPage = () => {
           ) : (
             <>
               <div className="table-wrap">
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
                       <th>التاريخ</th>

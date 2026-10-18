@@ -143,6 +143,7 @@ export const ExpensesPage = () => {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="البيان أو الرقم المرجعي"
+                latinDigits
               />
             </Field>
             <Field label="التصنيف">
@@ -242,7 +243,7 @@ export const ExpensesPage = () => {
                 <span className="muted small">{formatCount(list.data.meta.total)} سجل</span>
               </div>
               <div className={`table-wrap${list.loading ? ' is-refreshing' : ''}`}>
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
                       <th>التاريخ</th>
@@ -263,7 +264,7 @@ export const ExpensesPage = () => {
                         <tr key={e.id} className={voided ? 'row-voided' : undefined}>
                           <td className="mono">{formatDate(e.expenseDate)}</td>
                           <td>{expenseCategoryLabel[e.category]}</td>
-                          <td className="wrap">
+                          <td className="wrap primary-cell">
                             <Link to={`/expenses/${e.id}`}>{e.description}</Link>
                           </td>
                           <td className="num mono amount">

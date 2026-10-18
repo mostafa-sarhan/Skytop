@@ -109,7 +109,7 @@ export const MovementsPage = () => {
           ) : (
             <>
               <div className="table-wrap">
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
                       <th>التاريخ</th>
@@ -126,7 +126,7 @@ export const MovementsPage = () => {
                     {data.items.map((row) => (
                       <tr key={row.id}>
                         <td className="mono">{formatDate(row.date)}</td>
-                        <td>
+                        <td className="primary-cell">
                           <Link to={`/accounts/${row.delegate.id}`}>{row.delegate.name}</Link>
                         </td>
                         <td>{movementKindLabel[row.kind]}</td>

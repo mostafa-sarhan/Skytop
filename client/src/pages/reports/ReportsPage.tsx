@@ -23,6 +23,7 @@ import {
 import { Badge, EmptyState, Field, Icon, LoadingBlock, PageHeader, SelectInput, TextInput } from '../../ui/primitives';
 import { PassengerListExport } from '../../components/PassengerListExport';
 import { AccountSummaryList } from '../../components/DelegateAccount';
+import { CompleteDocumentsModal } from '../../components/CompleteDocumentsModal';
 
 type ReportId = 'trip' | 'delegate-trip' | 'missing' | 'statement' | 'payments';
 
@@ -126,7 +127,7 @@ const PassengerTable = ({ rows, withDelegate }: { rows: TripPilgrimsReport['rows
   const delegateOf = (row: (typeof rows)[number]) => (withDelegate && 'delegateName' in row ? row.delegateName : '');
   return (
     <div className="table-wrap">
-      <table className="data">
+      <table className="data stack-on-phone stack-on-tablet">
         <thead>
           <tr>
             <th>م</th>
@@ -151,10 +152,10 @@ const PassengerTable = ({ rows, withDelegate }: { rows: TripPilgrimsReport['rows
                 ) : null}
                 <tr>
                   <td className="mono">{row.index}</td>
-                  <td>
+                  <td className="name-cell primary-cell">
                     <strong>{row.name}</strong>
                   </td>
-                  <td>{row.job || '—'}</td>
+                  <td className="note-cell">{row.job || '—'}</td>
                   <td className="wrap">{row.address || '—'}</td>
                   <td className="mono">{row.passportNumber}</td>
                   <td className="mono">{row.nationalId || '—'}</td>
@@ -352,6 +353,7 @@ const MissingReport = ({ trips, delegates }: { trips: TripOption[]; delegates: D
     (signal) => api.get<MissingDocumentsReport>('/reports/missing-documents', query, signal),
     [tripId, delegateId],
   );
+  const [completing, setCompleting] = useState<MissingDocumentsReport['rows'][number] | null>(null);
   return (
     <div className="stack">
       <div className="card">
@@ -401,7 +403,7 @@ const MissingReport = ({ trips, delegates }: { trips: TripOption[]; delegates: D
               <EmptyState icon="check-circle" title="لا توجد مستندات ناقصة" description="كل المعتمرين النشطين ضمن هذا الاختيار ملفاتهم مكتملة" />
             ) : (
               <div className="table-wrap">
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
                       <th>م</th>
@@ -410,14 +412,17 @@ const MissingReport = ({ trips, delegates }: { trips: TripOption[]; delegates: D
                       <th>الرحلة</th>
                       <th>المندوب</th>
                       <th>المستندات الناقصة</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.data.rows.map((row) => (
-                      <tr key={`${row.passportNumber}-${row.index}`}>
+                      <tr key={row.pilgrimId}>
                         <td className="mono">{row.index}</td>
-                        <td>
-                          <strong>{row.name}</strong>
+                        <td className="name-cell primary-cell">
+                          <Link to={`/pilgrims/${row.pilgrimId}`}>
+                            <strong>{row.name}</strong>
+                          </Link>
                         </td>
                         <td className="mono">{row.passportNumber}</td>
                         <td>{row.tripName}</td>
@@ -428,6 +433,17 @@ const MissingReport = ({ trips, delegates }: { trips: TripOption[]; delegates: D
                             {!row.hasPersonalPhoto ? <Badge tone="warning">الصورة الشخصية</Badge> : null}
                           </div>
                         </td>
+                        <td>
+                          {row.canUploadDocuments ? (
+                            <button type="button" className="btn secondary sm" onClick={() => setCompleting(row)}>
+                              <Icon name="plus" size={14} /> استكمال النواقص
+                            </button>
+                          ) : (
+                            <span className="muted small" title="الرحلة مكتملة: المستندات للعرض فقط">
+                              للعرض فقط
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -437,6 +453,13 @@ const MissingReport = ({ trips, delegates }: { trips: TripOption[]; delegates: D
           </>
         )}
       </div>
+      {completing ? (
+        <CompleteDocumentsModal
+          pilgrim={completing}
+          onUploaded={data.reload}
+          onClose={() => setCompleting(null)}
+        />
+      ) : null}
     </div>
   );
 };
@@ -528,7 +551,7 @@ const PaymentsReport = ({ delegates }: { delegates: DelegateOption[] }) => {
               <EmptyState icon="wallet" title="لا توجد دفعات في هذه الفترة" />
             ) : (
               <div className="table-wrap">
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
                       <th>م</th>
@@ -545,7 +568,7 @@ const PaymentsReport = ({ delegates }: { delegates: DelegateOption[] }) => {
                     {data.data.rows.map((row) => (
                       <tr key={`${row.receiptNumber}-${row.index}`} className={row.status === 'VOIDED' ? 'row-voided' : undefined}>
                         <td className="mono">{row.index}</td>
-                        <td className="mono">{row.receiptNumber || '—'}</td>
+                        <td className="mono primary-cell">{row.receiptNumber || '—'}</td>
                         <td>{row.delegateName}</td>
                         <td className="num mono amount">{formatAmount(row.amount)}</td>
                         <td>{paymentMethodLabel[row.paymentMethod]}</td>

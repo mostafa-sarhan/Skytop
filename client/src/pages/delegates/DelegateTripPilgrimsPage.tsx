@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { DelegateTripPilgrim, DelegateTripPilgrims, PilgrimStatus } from '../../api/types';
-import { PHONE_QUERY, useAsync, useMediaQuery } from '../../lib/hooks';
+import { CARDS_QUERY, useAsync, useMediaQuery } from '../../lib/hooks';
 import {
   documentStatusLabel,
   flightTypeLabel,
@@ -34,7 +34,8 @@ import { PassengerListExport } from '../../components/PassengerListExport';
 export const DelegateTripPilgrimsPage = () => {
   const { delegateId = '', tripId = '' } = useParams();
   const navigate = useNavigate();
-  const phone = useMediaQuery(PHONE_QUERY);
+  // Tablets and phones: cards (every action reachable without sideways scrolling).
+  const cards = useMediaQuery(CARDS_QUERY);
   const [view, setView] = useState<PilgrimStatus>('ACTIVE');
   const [search, setSearch] = useState('');
   const [docFilter, setDocFilter] = useState<'ALL' | 'INCOMPLETE'>('ALL');
@@ -103,7 +104,7 @@ export const DelegateTripPilgrimsPage = () => {
   const canEdit = can.canEditPilgrims;
   const canTransfer = can.canChangeManifest;
 
-  /** Actions shared by the table (icons + tooltips) and the phone cards (labelled). */
+  /** Actions shared by the table (icons + tooltips) and the cards (labelled). */
   const renderActions = (pilgrim: DelegateTripPilgrim, labelled: boolean) => {
     const cls = labelled ? 'btn secondary sm' : 'btn ghost sm icon-only';
     const label = (text: string) => (labelled ? ` ${text}` : null);
@@ -254,8 +255,7 @@ export const DelegateTripPilgrimsPage = () => {
           )
         ) : !loading && rows.length === 0 ? (
           <EmptyState title="لا توجد نتائج مطابقة" />
-        ) : !loading && phone ? (
-          // Phones: stacked cards — every action reachable without sideways scrolling.
+        ) : !loading && cards ? (
           <ul className="pilgrim-cards">
             {rows.map((pilgrim, index) => (
               <li key={pilgrim.id} className={`pilgrim-card${pilgrim.status === 'CANCELLED' ? ' is-cancelled' : ''}`}>

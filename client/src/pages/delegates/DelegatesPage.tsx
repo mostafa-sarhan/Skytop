@@ -212,7 +212,7 @@ export const DelegatesPage = () => {
           ) : (
             <>
               <div className="table-wrap">
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
                       <th>اسم المندوب</th>
@@ -227,7 +227,7 @@ export const DelegatesPage = () => {
                     {data.items.map((delegate) => {
                       return (
                         <tr key={delegate.id}>
-                          <td>
+                          <td className="primary-cell">
                             <Link to={`/delegates/${delegate.id}`}>
                               <strong>{delegate.name}</strong>
                             </Link>

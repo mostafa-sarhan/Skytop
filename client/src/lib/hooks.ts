@@ -109,4 +109,5 @@ export const useMediaQuery = (query: string): boolean =>
     () => false,
   );
 
-export const PHONE_QUERY = '(max-width: 640px)';
+/** Tablets and phones: lists with many columns switch to cards. */
+export const CARDS_QUERY = '(max-width: 900px)';

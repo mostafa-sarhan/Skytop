@@ -415,6 +415,7 @@ export interface MissingDocumentsReport {
   meta: ReportMeta;
   rows: Array<{
     index: number;
+    pilgrimId: string;
     name: string;
     passportNumber: string;
     tripName: string;
@@ -423,6 +424,8 @@ export interface MissingDocumentsReport {
     documentStatus: DocumentStatus;
     hasPassportImage: boolean;
     hasPersonalPhoto: boolean;
+    /** False when the trip is completed (documents are read-only). */
+    canUploadDocuments: boolean;
   }>;
   summary: {
     total: number;

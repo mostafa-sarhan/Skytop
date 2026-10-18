@@ -108,7 +108,7 @@ export const PaymentsPage = () => {
               </SelectInput>
             </Field>
             <Field label="رقم الإيصال / المندوب">
-              <TextInput value={search} onChange={(event) => setSearch(event.target.value)} />
+              <TextInput value={search} onChange={(event) => setSearch(event.target.value)} latinDigits />
             </Field>
             <Field label="الحالة">
               <SelectInput
@@ -149,25 +149,23 @@ export const PaymentsPage = () => {
           ) : (
             <>
               <div className="table-wrap">
-                <table className="data stack-on-phone">
+                <table className="data stack-on-phone stack-on-tablet">
                   <thead>
                     <tr>
-                      <th>رقم الإيصال الورقي</th>
+                      <th>رقم الإيصال</th>
                       <th>تاريخ الدفع</th>
                       <th>المندوب</th>
                       <th className="num">المبلغ</th>
                       <th>طريقة الدفع</th>
-                      <th>المرجع</th>
                       <th>سجّلها</th>
-                      <th>حالة الحركة</th>
-                      <th>صورة الإيصال</th>
-                      {isManager ? <th></th> : null}
+                      <th>الحالة</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.items.map((payment) => (
                       <tr key={payment.id}>
-                        <td className="mono">
+                        <td className="mono primary-cell">
                           <strong>{receiptNumberOf(payment)}</strong>
                         </td>
                         <td className="mono">{formatDate(payment.paymentDate)}</td>
@@ -181,15 +179,18 @@ export const PaymentsPage = () => {
                         <td className="num mono">
                           <strong>{formatAmount(payment.amount)}</strong>
                         </td>
-                        <td>{paymentMethodLabel[payment.paymentMethod]}</td>
-                        <td className="mono">
-                          {payment.paymentMethod === 'TRANSFER' && payment.transferType
-                            ? transferTypeLabel[payment.transferType]
-                            : '—'}
-                          {payment.referenceNumber ? ` — ${payment.referenceNumber}` : ''}
+                        <td className="note-cell">
+                          {paymentMethodLabel[payment.paymentMethod]}
+                          {payment.transferType || payment.referenceNumber ? (
+                            <div className="muted small">
+                              {payment.transferType ? transferTypeLabel[payment.transferType] : ''}
+                              {payment.transferType && payment.referenceNumber ? ' — ' : ''}
+                              {payment.referenceNumber ? <span className="mono">{payment.referenceNumber}</span> : null}
+                            </div>
+                          ) : null}
                         </td>
                         <td>{payment.createdBy?.fullName ?? '—'}</td>
-                        <td>
+                        <td className="note-cell">
                           <Badge tone={payment.status === 'ACTIVE' ? 'success' : 'danger'}>
                             {paymentStatusLabel[payment.status]}
                           </Badge>
@@ -202,21 +203,15 @@ export const PaymentsPage = () => {
                           ) : null}
                         </td>
                         <td>
-                          <ReceiptScanLink payment={payment} />
-                        </td>
-                        {isManager ? (
-                          <td>
-                            {payment.status === 'ACTIVE' ? (
-                              <button
-                                type="button"
-                                className="btn ghost sm"
-                                onClick={() => setVoiding(payment)}
-                              >
+                          <div className="row-actions">
+                            <ReceiptScanLink payment={payment} />
+                            {isManager && payment.status === 'ACTIVE' ? (
+                              <button type="button" className="btn ghost sm" onClick={() => setVoiding(payment)}>
                                 إلغاء الدفعة
                               </button>
                             ) : null}
-                          </td>
-                        ) : null}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

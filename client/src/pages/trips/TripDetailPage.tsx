@@ -228,7 +228,7 @@ export const TripDetailPage = () => {
             />
           ) : (
             <div className="table-wrap">
-              <table className="data stack-on-phone">
+              <table className="data stack-on-phone stack-on-tablet">
                 <thead>
                   <tr>
                     <th>المندوب</th>
@@ -241,7 +241,7 @@ export const TripDetailPage = () => {
                 <tbody>
                   {data.delegates.map((row) => (
                     <tr key={row.id}>
-                      <td>
+                      <td className="primary-cell">
                         <Link to={workspace(row.delegate.id)}>
                           <strong>{row.delegate.name}</strong>
                         </Link>
@@ -421,6 +421,7 @@ const AssignDelegateModal = ({
           onChange={(event) => setPrice(event.target.value)}
           dir="ltr"
           inputMode="decimal"
+          latinDigits
           placeholder="0.00"
         />
       </Field>
@@ -514,6 +515,7 @@ const PriceModal = ({
           onChange={(event) => setPrice(event.target.value)}
           dir="ltr"
           inputMode="decimal"
+          latinDigits
         />
       </Field>
       {assignment.locked ? (

@@ -105,7 +105,7 @@ export const ExpenseCreatePage = () => {
                 </SelectInput>
               </Field>
               <Field label="المبلغ" required error={fieldErrors.amount} hint="بالجنيه، حتى خانتين عشريتين">
-                <TextInput value={amount} onChange={(event) => setAmount(event.target.value)} dir="ltr" inputMode="decimal" placeholder="0.00" />
+                <TextInput value={amount} onChange={(event) => setAmount(event.target.value)} latinDigits dir="ltr" inputMode="decimal" placeholder="0.00" />
               </Field>
               <Field label="تاريخ المصروف" required error={fieldErrors.expenseDate}>
                 <TextInput type="date" dir="ltr" value={expenseDate} onChange={(event) => setExpenseDate(event.target.value)} />
@@ -125,7 +125,7 @@ export const ExpenseCreatePage = () => {
                     </SelectInput>
                   </Field>
                   <Field label="الرقم المرجعي" error={fieldErrors.referenceNumber} hint="اختياري">
-                    <TextInput value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} dir="ltr" />
+                    <TextInput value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} latinDigits dir="ltr" />
                   </Field>
                 </>
               ) : null}

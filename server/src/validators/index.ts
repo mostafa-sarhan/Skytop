@@ -17,6 +17,7 @@ import {
   optionalText,
   paginationQuery,
   phone,
+  referenceText,
   reasonSchema,
   uuid,
   uuidParam,
@@ -267,7 +268,7 @@ export const createPaymentSchema = z
     receiptNumber: receiptNumberSchema,
     paymentMethod: z.nativeEnum(PaymentMethod),
     transferType: z.nativeEnum(TransferType).optional(),
-    referenceNumber: optionalText(120, 'الرقم المرجعي للتحويل'),
+    referenceNumber: referenceText(120, 'الرقم المرجعي للتحويل'),
     paymentDate: dateOnly,
     notes: optionalText(500, 'الملاحظات'),
   })
@@ -381,7 +382,7 @@ export const createExpenseSchema = z
     expenseDate: z.string({ required_error: 'تاريخ المصروف مطلوب' }).min(1, 'تاريخ المصروف مطلوب').pipe(dateOnly),
     paymentMethod: z.nativeEnum(PaymentMethod, { errorMap: () => ({ message: 'اختر طريقة الدفع' }) }),
     transferType: z.nativeEnum(TransferType, { errorMap: () => ({ message: 'اختر نوع التحويل' }) }).optional(),
-    referenceNumber: optionalText(120, 'الرقم المرجعي'),
+    referenceNumber: referenceText(120, 'الرقم المرجعي'),
     description: z
       .string({ required_error: 'البيان مطلوب' })
       .trim()
@@ -416,7 +417,7 @@ export const expenseListQuery = paginationQuery.extend({
 
 export const expenseReportQuery = z.object({
   ...expenseFilters,
-  search: z.string().trim().max(120).optional(),
+  search: paginationQuery.shape.search,
   // Voided expenses are left out of exports unless explicitly asked for.
   includeVoided: z.enum(['0', '1']).default('0').transform((v) => v === '1'),
 });

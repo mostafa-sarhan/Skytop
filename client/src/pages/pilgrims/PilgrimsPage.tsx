@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { PilgrimFilterOptions, PilgrimList, PilgrimListItem, PilgrimStatus as PilgrimStatusValue } from '../../api/types';
-import { PHONE_QUERY, useAsync, useMediaQuery } from '../../lib/hooks';
+import { CARDS_QUERY, useAsync, useMediaQuery } from '../../lib/hooks';
 import { documentStatusLabel, formatCount, formatDate } from '../../lib/format';
 import {
   Badge,
@@ -33,7 +33,7 @@ const PilgrimStatus = ({ pilgrim, withDate = false }: { pilgrim: PilgrimListItem
     <Badge tone="success">نشط</Badge>
   );
 
-/** Row actions shared by the table (icons) and the phone cards (labelled). */
+/** Row actions shared by the table (icons) and the cards (labelled). */
 const PilgrimActions = ({ pilgrim, origin, labelled = false }: { pilgrim: PilgrimListItem; origin: PilgrimListOrigin; labelled?: boolean }) => {
   const canEdit = pilgrim.status !== 'CANCELLED' && pilgrim.tripCapabilities.canEditPilgrims;
   const cls = labelled ? 'btn secondary sm' : 'btn ghost sm icon-only';
@@ -60,7 +60,8 @@ const PilgrimActions = ({ pilgrim, origin, labelled = false }: { pilgrim: Pilgri
  */
 export const PilgrimsPage = () => {
   const location = useLocation();
-  const phone = useMediaQuery(PHONE_QUERY);
+  // Tablets and phones: cards (every action reachable without sideways scrolling).
+  const cards = useMediaQuery(CARDS_QUERY);
   const [params, setParams] = useSearchParams();
   const status = (params.get('status') as PilgrimStatusValue | null) ?? 'ACTIVE';
   const tripId = params.get('tripId') ?? '';
@@ -229,8 +230,7 @@ export const PilgrimsPage = () => {
             />
           ) : (
             <>
-              {phone ? (
-                // Phones: stacked cards — every action reachable without sideways scrolling.
+              {cards ? (
                 <ul className={`pilgrim-cards${loading ? ' is-refreshing' : ''}`}>
                   {data.items.map((pilgrim) => (
                     <li key={pilgrim.id} className={`pilgrim-card${pilgrim.status === 'CANCELLED' ? ' is-cancelled' : ''}`}>

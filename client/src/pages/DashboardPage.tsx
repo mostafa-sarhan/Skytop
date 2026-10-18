@@ -202,7 +202,9 @@ export const DashboardPage = () => {
             {/* Company expenses are separate from delegate money: own line, own page. */}
             <div className="row between dash-expenses">
               <span className="muted">
-                مصروفات الشركة هذا الشهر: <strong className="mono">{formatAmount(finance.monthExpenses)} جنيه</strong>
+                مصروفات الشركة هذا الشهر: <strong className="money">
+                  <span className="mono-inline">{formatAmount(finance.monthExpenses)}</span> جنيه
+                </strong>
               </span>
               <Link className="btn ghost sm" to="/expenses">
                 المصروفات
@@ -234,7 +236,7 @@ export const DashboardPage = () => {
             />
           ) : (
             <div className="table-wrap">
-              <table className="data stack-on-phone">
+              <table className="data stack-on-phone stack-on-tablet">
                 <thead>
                   <tr>
                     <th>الرحلة</th>
@@ -249,7 +251,7 @@ export const DashboardPage = () => {
                 <tbody>
                   {upcomingTrips.map((trip) => (
                     <tr key={trip.id}>
-                      <td>
+                      <td className="primary-cell">
                         <Link to={`/trips/${trip.id}`}>
                           <strong>{trip.name}</strong>
                         </Link>

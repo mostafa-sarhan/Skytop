@@ -5,6 +5,7 @@ import { AppError } from '../utils/AppError';
 import { decimalToJson } from '../utils/money';
 import { computeDocumentStatus, listDelegateTripPilgrims } from './pilgrim.service';
 import { compareArabic, sortByArabic } from '../utils/arabicSort';
+import { tripCapabilities } from './tripRules';
 
 export interface ReportMeta {
   title: string;
@@ -145,10 +146,11 @@ export const missingDocumentsReport = async (filters: { tripId?: string; delegat
     prisma.pilgrim.findMany({
       where: { AND: [scope, incompleteWhere] },
       select: {
+        id: true,
         name: true,
         passportNumber: true,
         delegate: { select: { name: true } },
-        trip: { select: { name: true, departureDate: true } },
+        trip: { select: { name: true, departureDate: true, status: true } },
         documents: { select: { type: true } },
       },
       orderBy: [{ trip: { departureDate: 'asc' } }],
@@ -172,6 +174,8 @@ export const missingDocumentsReport = async (filters: { tripId?: string; delegat
     const types = p.documents.map((d) => d.type);
     return {
       index: index + 1,
+      // For the screen (profile link, completing documents); exports ignore it.
+      pilgrimId: p.id,
       name: p.name,
       passportNumber: p.passportNumber,
       tripName: p.trip.name,
@@ -180,6 +184,8 @@ export const missingDocumentsReport = async (filters: { tripId?: string; delegat
       documentStatus: computeDocumentStatus(types),
       hasPassportImage: types.includes('PASSPORT_IMAGE'),
       hasPersonalPhoto: types.includes('PERSONAL_PHOTO'),
+      // Same trip rule the upload endpoint enforces (COMPLETED trips are read-only).
+      canUploadDocuments: tripCapabilities(p.trip.status).canEditPilgrims,
     };
   });
 

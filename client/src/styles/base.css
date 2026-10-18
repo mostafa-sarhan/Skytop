@@ -152,11 +152,25 @@ kbd {
   font-weight: 700;
 }
 
+/* Numbers / dates / codes: digits run left-to-right (so "2026/10/18 17:12"
+   keeps its order), but a block keeps the page's RTL side — otherwise values
+   jump away from their labels (kv lists, stat cards, cards). Table numeric
+   columns set their own side (components.css). */
 .mono {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
   direction: ltr;
   unicode-bidi: embed;
+  text-align: right;
+}
+
+/* Inline numbers inside Arabic text (phone, amounts, dates): Western digits
+   kept in LTR order without changing the alignment of the surrounding block. */
+.mono-inline {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .nums {
