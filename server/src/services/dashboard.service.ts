@@ -25,10 +25,17 @@ const incompleteFileWhere: Prisma.PilgrimWhereInput = {
  * as /accounts). Manager only.
  */
 const financeOverview = async (today: Date) => {
-  const [delegates, paymentCount, todayAgg] = await Promise.all([
+  const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+  const nextMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1));
+  const [delegates, paymentCount, todayAgg, monthExpenses] = await Promise.all([
     prisma.delegate.findMany({ select: { id: true } }),
     prisma.payment.count({ where: { status: 'ACTIVE' } }),
     prisma.payment.aggregate({ where: { status: 'ACTIVE', paymentDate: today }, _sum: { amount: true } }),
+    // Company expenses are separate from delegate money; shown on their own line.
+    prisma.expense.aggregate({
+      where: { status: 'ACTIVE', expenseDate: { gte: monthStart, lt: nextMonth } },
+      _sum: { amount: true },
+    }),
   ]);
   const accounts = [...(await getDelegateAccounts(delegates.map((d) => d.id))).values()];
   const sum = (pick: (a: (typeof accounts)[number]) => string) =>
@@ -43,6 +50,7 @@ const financeOverview = async (today: Date) => {
     creditDelegates: accounts.filter((a) => a.status === 'CREDIT').length,
     paymentCount,
     todayAmount: decimalToJson(todayAgg._sum.amount ?? new Prisma.Decimal(0))!,
+    monthExpenses: decimalToJson(monthExpenses._sum.amount ?? new Prisma.Decimal(0))!,
   };
 };
 

@@ -387,6 +387,8 @@ export interface DashboardStats {
     creditDelegates: number;
     paymentCount: number;
     todayAmount: string;
+    /** Company expenses this month — separate from delegate money. */
+    monthExpenses: string;
   } | null;
 }
 
@@ -482,3 +484,57 @@ export interface PaymentReport {
   rows: PaymentReportRow[];
   summary: { count: number; activeCount: number; totalActive: string };
 }
+
+// ---------------------------------------------------------------------------
+// Company expenses (separate from delegate accounts)
+// ---------------------------------------------------------------------------
+
+export type ExpenseCategory =
+  | 'ELECTRICITY'
+  | 'INTERNET'
+  | 'RENT'
+  | 'OFFICE_SUPPLIES'
+  | 'MAINTENANCE'
+  | 'TRANSPORTATION'
+  | 'HOSPITALITY'
+  | 'OTHER';
+
+export type ExpenseStatus = 'ACTIVE' | 'VOIDED';
+
+export interface Expense {
+  id: string;
+  category: ExpenseCategory;
+  amount: string;
+  expenseDate: string;
+  paymentMethod: PaymentMethod;
+  transferType: TransferType | null;
+  referenceNumber: string | null;
+  description: string;
+  notes: string | null;
+  hasAttachment: boolean;
+  attachmentOriginalName: string | null;
+  attachmentMimeType: string | null;
+  attachmentSizeBytes: number | null;
+  status: ExpenseStatus;
+  createdBy: { id: string; fullName: string };
+  createdAt: string;
+  /** Manager only (null for employees). */
+  voidedBy: { id: string; fullName: string } | null;
+  voidedAt: string | null;
+  voidReason: string | null;
+}
+
+export interface ExpenseList extends Paginated<Expense> {
+  /** Total of the filtered list, ACTIVE expenses only (computed on the server). */
+  filtered: { activeCount: number; activeTotal: string };
+}
+
+export interface ExpenseSummary {
+  totalActive: string;
+  activeCount: number;
+  monthTotal: string;
+  monthCount: number;
+  /** Manager only. */
+  monthByCategory: Array<{ category: ExpenseCategory; total: string }> | null;
+}
+

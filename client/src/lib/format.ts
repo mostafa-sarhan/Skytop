@@ -2,6 +2,8 @@ import type {
   AccountStatus,
   DelegateStatus,
   DocumentStatus,
+  ExpenseCategory,
+  ExpenseStatus,
   FlightType,
   AdjustmentDirection,
   AdjustmentType,
@@ -171,6 +173,24 @@ export const auditActionLabel: Record<string, string> = {
   DELEGATE_CREATED: 'إضافة مندوب',
   DELEGATE_UPDATED: 'تعديل مندوب',
   DELEGATE_STATUS_CHANGED: 'تغيير حالة مندوب',
+  EXPENSE_CREATED: 'تسجيل مصروف',
+  EXPENSE_VOIDED: 'إلغاء مصروف',
+};
+
+export const expenseCategoryLabel: Record<ExpenseCategory, string> = {
+  ELECTRICITY: 'كهرباء',
+  INTERNET: 'إنترنت',
+  RENT: 'إيجار',
+  OFFICE_SUPPLIES: 'أدوات مكتبية',
+  MAINTENANCE: 'صيانة',
+  TRANSPORTATION: 'نقل',
+  HOSPITALITY: 'ضيافة',
+  OTHER: 'أخرى',
+};
+
+export const expenseStatusLabel: Record<ExpenseStatus, string> = {
+  ACTIVE: 'مسجل',
+  VOIDED: 'ملغى',
 };
 
 export const adjustmentTypeLabel: Record<AdjustmentType, string> = {

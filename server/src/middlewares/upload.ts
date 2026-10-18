@@ -28,12 +28,33 @@ const multerMessage = (error: multer.MulterError): string => {
   return 'تعذر رفع الملف';
 };
 
+/**
+ * Browsers send multipart file names as UTF-8, but busboy (via multer 1.x)
+ * decodes them as Latin-1, so an Arabic name such as «فاتورة.png» would be
+ * stored garbled. Re-decode; ASCII names are unchanged.
+ */
+const utf8Name = (name: string): string => {
+  const decoded = Buffer.from(name, 'latin1').toString('utf8');
+  return decoded.includes('\uFFFD') ? name : decoded;
+};
+
+const fixFileNames = (req: Parameters<RequestHandler>[0]) => {
+  const files = [
+    ...(req.file ? [req.file] : []),
+    ...(Array.isArray(req.files) ? req.files : Object.values(req.files ?? {}).flat()),
+  ];
+  for (const file of files) file.originalname = utf8Name(file.originalname);
+};
+
 /** Runs a multer handler and turns its errors into clear Arabic AppErrors. */
 export const runMulter =
   (handler: RequestHandler): RequestHandler =>
   (req, res, next) => {
     handler(req, res, (error: unknown) => {
-      if (!error) return next();
+      if (!error) {
+        fixFileNames(req);
+        return next();
+      }
       if (error instanceof AppError) return next(error);
       if (error instanceof multer.MulterError) {
         return next(AppError.badRequest(multerMessage(error), { field: error.field }));

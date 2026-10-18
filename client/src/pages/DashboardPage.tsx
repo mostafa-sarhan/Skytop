@@ -198,6 +198,15 @@ export const DashboardPage = () => {
                 />
               ) : null}
             </div>
+            {/* Company expenses are separate from delegate money: own line, own page. */}
+            <div className="row between dash-expenses">
+              <span className="muted">
+                مصروفات الشركة هذا الشهر: <strong className="mono">{formatAmount(finance.monthExpenses)} جنيه</strong>
+              </span>
+              <Link className="btn ghost sm" to="/expenses">
+                المصروفات
+              </Link>
+            </div>
           </div>
         </div>
       ) : null}

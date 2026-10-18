@@ -1600,3 +1600,16 @@ tr.group-row td {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------------------------------------------------------------- expenses */
+
+.strike {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.dash-expenses {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}

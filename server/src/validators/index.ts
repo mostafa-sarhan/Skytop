@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { Prisma } from '@prisma/client';
 import {
   DelegateStatus,
+  ExpenseCategory,
   FinancialAdjustmentType,
   FlightType,
   PaymentMethod,
@@ -356,6 +358,72 @@ export const adjustmentListQuery = paginationQuery.extend({
 });
 
 export type AdjustmentListQuery = z.infer<typeof adjustmentListQuery>;
+
+// ---------------------------------------------------------------------------
+// Company expenses
+// ---------------------------------------------------------------------------
+
+const expenseCategory = z.nativeEnum(ExpenseCategory, {
+  errorMap: () => ({ message: 'اختر تصنيف المصروف' }),
+});
+
+// multipart/form-data: all values arrive as strings; the file is `file`.
+export const createExpenseSchema = z
+  .object({
+    category: expenseCategory,
+    amount: z
+      .string({ required_error: 'المبلغ مطلوب' })
+      .trim()
+      .min(1, 'المبلغ مطلوب')
+      .pipe(money({ max: 100_000_000_000 }))
+      // Decimal comparison (no floating point).
+      .refine((v) => new Prisma.Decimal(v).greaterThan(0), 'المبلغ يجب أن يكون أكبر من صفر'),
+    expenseDate: z.string({ required_error: 'تاريخ المصروف مطلوب' }).min(1, 'تاريخ المصروف مطلوب').pipe(dateOnly),
+    paymentMethod: z.nativeEnum(PaymentMethod, { errorMap: () => ({ message: 'اختر طريقة الدفع' }) }),
+    transferType: z.nativeEnum(TransferType, { errorMap: () => ({ message: 'اختر نوع التحويل' }) }).optional(),
+    referenceNumber: optionalText(120, 'الرقم المرجعي'),
+    description: z
+      .string({ required_error: 'البيان مطلوب' })
+      .trim()
+      .min(2, 'اكتب بيان المصروف (حرفان على الأقل)')
+      .max(500, 'البيان طويل جداً'),
+    notes: optionalText(1000, 'الملاحظات'),
+  })
+  .strict()
+  .refine((v) => v.paymentMethod !== PaymentMethod.TRANSFER || Boolean(v.transferType), {
+    message: 'اختر نوع التحويل',
+    path: ['transferType'],
+  })
+  .refine((v) => v.paymentMethod === PaymentMethod.TRANSFER || !v.transferType, {
+    message: 'نوع التحويل يُستخدم فقط مع طريقة الدفع بالتحويل',
+    path: ['transferType'],
+  });
+
+export const voidExpenseSchema = z.object({ reason: reasonSchema }).strict();
+
+/** Filters shared by the list and the exports (same rules → same totals). */
+const expenseFilters = {
+  category: expenseCategory.optional(),
+  paymentMethod: z.nativeEnum(PaymentMethod).optional(),
+  from: dateOnly.optional(),
+  to: dateOnly.optional(),
+};
+
+export const expenseListQuery = paginationQuery.extend({
+  ...expenseFilters,
+  status: z.enum(['ACTIVE', 'VOIDED']).optional(),
+});
+
+export const expenseReportQuery = z.object({
+  ...expenseFilters,
+  search: z.string().trim().max(120).optional(),
+  // Voided expenses are left out of exports unless explicitly asked for.
+  includeVoided: z.enum(['0', '1']).default('0').transform((v) => v === '1'),
+});
+
+export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
+export type ExpenseListQuery = z.infer<typeof expenseListQuery>;
+export type ExpenseReportQuery = z.infer<typeof expenseReportQuery>;
 
 export { uuidParam };
 

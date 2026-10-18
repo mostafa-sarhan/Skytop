@@ -3,6 +3,7 @@ import { Request } from 'express';
 import { getParams, getQuery } from '../middlewares/validate';
 import * as reportService from '../services/report.service';
 import * as accountService from '../services/delegateAccount.service';
+import * as expenseService from '../services/expense.service';
 import { getActor } from '../utils/actor';
 import { ok } from '../utils/http';
 import { buildExcelBuffer, ExcelColumn } from '../modules/excel/excel';
@@ -16,6 +17,7 @@ import {
   MissingDocumentsQuery,
   StatementParams,
   PaymentHistoryQuery,
+  ExpenseReportQuery,
 } from '../validators';
 
 const sendPdf = (res: Response, buffer: Buffer, filename: string): void => {
@@ -439,3 +441,94 @@ export const paymentsPdf = async (req: Request, res: Response): Promise<void> =>
   });
   sendPdf(res, buffer, 'payments.pdf');
 };
+
+// ---------------------------------------------------------------------------
+// Company expenses (المصروفات) — separate from delegate accounts
+// ---------------------------------------------------------------------------
+
+const EXPENSE_CATEGORY_LABEL: Record<string, string> = {
+  ELECTRICITY: 'كهرباء',
+  INTERNET: 'إنترنت',
+  RENT: 'إيجار',
+  OFFICE_SUPPLIES: 'أدوات مكتبية',
+  MAINTENANCE: 'صيانة',
+  TRANSPORTATION: 'نقل',
+  HOSPITALITY: 'ضيافة',
+  OTHER: 'أخرى',
+};
+const expenseStatusLabel = (value: string): string => (value === 'VOIDED' ? 'ملغى' : 'مسجل');
+
+const expenseColumns = (includeVoided: boolean): ExcelColumn[] => [
+  { key: 'index', header: 'م', width: 5, align: 'center' },
+  { key: 'expenseDate', header: 'التاريخ', width: 14 },
+  { key: 'category', header: 'التصنيف', width: 14 },
+  { key: 'description', header: 'البيان', width: 36 },
+  { key: 'amount', header: 'المبلغ', width: 14, money: true },
+  { key: 'paymentMethod', header: 'طريقة الدفع', width: 18 },
+  { key: 'referenceNumber', header: 'الرقم المرجعي', width: 16 },
+  { key: 'createdBy', header: 'سجّله', width: 18 },
+  ...(includeVoided ? [{ key: 'status', header: 'الحالة', width: 10 }] : []),
+];
+
+const loadExpenseReport = async (req: Request) => {
+  const query = getQuery<ExpenseReportQuery>(req);
+  return { query, report: await expenseService.expenseReport(query) };
+};
+
+const expenseContext = (query: ExpenseReportQuery) => [
+  { label: 'التصنيف', value: query.category ? EXPENSE_CATEGORY_LABEL[query.category]! : 'كل التصنيفات' },
+  { label: 'طريقة الدفع', value: query.paymentMethod ? methodLabel(query.paymentMethod) : 'الكل' },
+  {
+    label: 'الفترة',
+    value:
+      query.from || query.to
+        ? `${query.from ? formatArabicDate(query.from) : '…'} — ${query.to ? formatArabicDate(query.to) : '…'}`
+        : 'كل الفترات',
+  },
+  { label: 'المصروفات الملغاة', value: query.includeVoided ? 'ظاهرة ومعلَّمة (لا تدخل في الإجمالي)' : 'غير ظاهرة' },
+];
+
+const expenseLabels = (row: Awaited<ReturnType<typeof expenseService.expenseReport>>['rows'][number]) => ({
+  ...row,
+  category: EXPENSE_CATEGORY_LABEL[row.category] ?? row.category,
+  paymentMethod: `${methodLabel(row.paymentMethod)}${row.transferType ? ` — ${transferLabel(row.transferType)}` : ''}`,
+  transferType: transferLabel(row.transferType),
+  referenceNumber: row.referenceNumber || '—',
+  status: expenseStatusLabel(row.status),
+});
+
+const expenseSummaryLines = (summary: { activeCount: number; activeTotal: string }, money: (v: string) => string) => [
+  { label: 'عدد المصروفات (بدون الملغاة)', value: String(summary.activeCount) },
+  { label: 'إجمالي المصروفات (بدون الملغاة)', value: money(summary.activeTotal) },
+];
+
+export const expensesExcel = async (req: Request, res: Response): Promise<void> => {
+  const { query, report } = await loadExpenseReport(req);
+  const buffer = await buildExcelBuffer({
+    sheetName: 'المصروفات',
+    title: `${COMPANY_NAME_AR} — كشف المصروفات`,
+    context: expenseContext(query),
+    columns: expenseColumns(query.includeVoided),
+    rows: report.rows.map((row) => ({ ...expenseLabels(row), amount: Number(row.amount) })),
+    summary: expenseSummaryLines(report.summary, (v) => v),
+  });
+  sendExcel(res, buffer, 'expenses.xlsx');
+};
+
+export const expensesPdf = async (req: Request, res: Response): Promise<void> => {
+  const { query, report } = await loadExpenseReport(req);
+  const buffer = await renderTablePdf({
+    title: 'كشف المصروفات',
+    context: expenseContext(query),
+    columns: pdfColumns(expenseColumns(query.includeVoided)),
+    rows: report.rows.map((row) => ({
+      ...expenseLabels(row),
+      amount: formatMoney(row.amount),
+      expenseDate: formatArabicDate(row.expenseDate),
+    })),
+    landscape: true,
+    summary: expenseSummaryLines(report.summary, (v) => `${formatMoney(v)} جنيه`),
+  });
+  sendPdf(res, buffer, 'expenses.pdf');
+};
+

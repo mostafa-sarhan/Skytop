@@ -13,6 +13,9 @@ import { PilgrimFormPage } from './pages/pilgrims/PilgrimFormPage';
 import { PilgrimDetailPage } from './pages/pilgrims/PilgrimDetailPage';
 import { PaymentsPage } from './pages/payments/PaymentsPage';
 import { PaymentCreatePage } from './pages/payments/PaymentCreatePage';
+import { ExpensesPage } from './pages/expenses/ExpensesPage';
+import { ExpenseCreatePage } from './pages/expenses/ExpenseCreatePage';
+import { ExpenseDetailPage } from './pages/expenses/ExpenseDetailPage';
 import { MovementsPage } from './pages/finance/MovementsPage';
 import { AccountsPage } from './pages/finance/AccountsPage';
 import { DelegateAccountPage } from './pages/finance/DelegateAccountPage';
@@ -57,6 +60,9 @@ export const App = () => (
         <Route path="/pilgrims/:id/edit" element={<PilgrimFormPage />} />
         <Route path="/payments" element={<PaymentsPage />} />
         <Route path="/payments/new" element={<PaymentCreatePage />} />
+        <Route path="/expenses" element={<ExpensesPage />} />
+        <Route path="/expenses/new" element={<ExpenseCreatePage />} />
+        <Route path="/expenses/:id" element={<ExpenseDetailPage />} />
         <Route
           path="/finance/movements"
           element={

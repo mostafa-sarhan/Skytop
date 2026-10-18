@@ -3,6 +3,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { validateParams, validateQuery } from '../middlewares/validate';
 import * as reportController from '../controllers/report.controller';
 import {
+  expenseReportQuery,
   missingDocumentsQuery,
   paymentHistoryQuery,
   reportDelegateTripQuery,
@@ -80,5 +81,9 @@ router.get(
 router.get('/payments', validateQuery(paymentHistoryQuery), asyncHandler(reportController.paymentsJson));
 router.get('/payments/excel', validateQuery(paymentHistoryQuery), asyncHandler(reportController.paymentsExcel));
 router.get('/payments/pdf', validateQuery(paymentHistoryQuery), asyncHandler(reportController.paymentsPdf));
+
+// Company expenses (same filters as the expenses list; voided excluded by default).
+router.get('/expenses/excel', validateQuery(expenseReportQuery), asyncHandler(reportController.expensesExcel));
+router.get('/expenses/pdf', validateQuery(expenseReportQuery), asyncHandler(reportController.expensesPdf));
 
 export default router;

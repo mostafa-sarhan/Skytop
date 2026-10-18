@@ -11,6 +11,7 @@ import financeRoutes from './finance.routes';
 import reportRoutes from './report.routes';
 import dashboardRoutes from './dashboard.routes';
 import auditRoutes from './audit.routes';
+import expenseRoutes from './expense.routes';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/finance', financeRoutes);
 router.use('/reports', reportRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/audit', auditRoutes);
+router.use('/expenses', expenseRoutes);
 
 export default router;

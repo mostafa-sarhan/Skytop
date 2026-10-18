@@ -54,6 +54,9 @@ const financeNav: NavItem[] = [
   { to: '/payments', label: 'سجل الدفعات', icon: 'wallet' },
 ];
 
+// Company expenses: their own section, never mixed with delegate money.
+const expensesNav: NavItem[] = [{ to: '/expenses', label: 'المصروفات', icon: 'receipt' }];
+
 // Low-level movement log, manager only (also enforced by the API).
 const managerFinanceNav: NavItem[] = [
   { to: '/finance/movements', label: 'سجل الحركات المالية', icon: 'ledger' },
@@ -67,7 +70,7 @@ const adminNav: NavItem[] = [
 ];
 
 const titleFor = (pathname: string): string => {
-  const all = [dashboardNav, ...operationsNav, ...financeNav, ...managerFinanceNav, ...adminNav];
+  const all = [dashboardNav, ...operationsNav, ...financeNav, ...managerFinanceNav, ...expensesNav, ...adminNav];
   const match = all
     .filter((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))
     .sort((a, b) => b.to.length - a.to.length)[0];
@@ -117,6 +120,7 @@ export const AppLayout = () => {
     { items: [dashboardNav] },
     { label: 'العمليات', items: operationsNav },
     { label: 'المالية', items: isManager ? [...financeNav, ...managerFinanceNav] : financeNav },
+    { label: 'مصروفات الشركة', items: expensesNav },
     { label: 'التقارير والإدارة', items: visibleAdmin },
   ];
 

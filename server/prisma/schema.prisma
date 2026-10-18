@@ -88,6 +88,8 @@ enum AuditAction {
   DELEGATE_CREATED
   DELEGATE_UPDATED
   DELEGATE_STATUS_CHANGED
+  EXPENSE_CREATED
+  EXPENSE_VOIDED
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +116,8 @@ model User {
   adjustments       FinancialAdjustment[] @relation("AdjustmentPerformedBy")
   voidedPayments    Payment[]             @relation("PaymentVoidedBy")
   cancelledPilgrims Pilgrim[]             @relation("PilgrimCancelledBy")
+  expenses          Expense[]             @relation("ExpenseCreatedBy")
+  voidedExpenses    Expense[]             @relation("ExpenseVoidedBy")
 
   @@index([role])
   @@index([isActive])
@@ -355,4 +359,59 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Company expenses — the company's own operating costs. Completely separate
+// from delegate accounts and payments (no relation to Delegate / Payment).
+// ---------------------------------------------------------------------------
+
+enum ExpenseCategory {
+  ELECTRICITY
+  INTERNET
+  RENT
+  OFFICE_SUPPLIES
+  MAINTENANCE
+  TRANSPORTATION
+  HOSPITALITY
+  OTHER
+}
+
+enum ExpenseStatus {
+  ACTIVE
+  VOIDED
+}
+
+/// Immutable once recorded: a wrong expense is voided by a manager (with a
+/// reason) and stays in history; it is never edited or deleted.
+model Expense {
+  id                     String          @id @default(uuid()) @db.Uuid
+  category               ExpenseCategory
+  amount                 Decimal         @db.Decimal(14, 2)
+  expenseDate            DateTime        @db.Date
+  paymentMethod          PaymentMethod
+  transferType           TransferType?
+  referenceNumber        String?         @db.VarChar(120)
+  description            String          @db.VarChar(500)
+  notes                  String?
+  /// Private storage key of the optional invoice / receipt (never public).
+  attachmentKey          String?         @unique @db.VarChar(300)
+  attachmentOriginalName String?         @db.VarChar(255)
+  attachmentMimeType     String?         @db.VarChar(120)
+  attachmentSizeBytes    Int?
+  status                 ExpenseStatus   @default(ACTIVE)
+  createdById            String          @db.Uuid
+  voidedById             String?         @db.Uuid
+  voidedAt               DateTime?
+  voidReason             String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  createdBy User  @relation("ExpenseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  voidedBy  User? @relation("ExpenseVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
+
+  @@index([expenseDate])
+  @@index([status, expenseDate])
+  @@index([category, expenseDate])
+  @@index([createdById])
 }
