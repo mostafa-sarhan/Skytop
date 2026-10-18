@@ -22,9 +22,10 @@ const greeting = (date: Date): string => (date.getHours() < 12 ? 'صباح ال�
 
 /** Money as "250,000.00 جنيه"; counts always go through formatCount. */
 const Money = ({ value }: { value: string }) => (
-  <>
+  // Amount + currency never split across lines (see .money-value).
+  <span className="money-value">
     {formatAmount(value)} <span className="currency">جنيه</span>
-  </>
+  </span>
 );
 
 type QuickLink = { to: string; label: string; hint: string; icon: IconName };

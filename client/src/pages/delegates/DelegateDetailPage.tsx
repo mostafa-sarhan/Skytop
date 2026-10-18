@@ -100,7 +100,8 @@ export const DelegateDetailPage = () => {
         }
       />
 
-      <div className="grid cols-2" style={{ alignItems: 'start' }}>
+      {/* Stacked (not side by side) so the trips table has the full width. */}
+      <div className="stack">
         <div className="card">
           <div className="card-header">
             <h3>بيانات المندوب</h3>

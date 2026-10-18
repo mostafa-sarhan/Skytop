@@ -177,6 +177,18 @@ export const auditActionLabel: Record<string, string> = {
   EXPENSE_VOIDED: 'إلغاء مصروف',
 };
 
+/** Audit record types (display only; stored values stay in English). */
+export const auditEntityLabel: Record<string, string> = {
+  Payment: 'دفعة',
+  Expense: 'مصروف',
+  FinancialAdjustment: 'تسوية مالية',
+  Pilgrim: 'معتمر',
+  Trip: 'رحلة',
+  Delegate: 'مندوب',
+  DelegateTrip: 'سعر مندوب في رحلة',
+  User: 'مستخدم',
+};
+
 export const expenseCategoryLabel: Record<ExpenseCategory, string> = {
   ELECTRICITY: 'كهرباء',
   INTERNET: 'إنترنت',

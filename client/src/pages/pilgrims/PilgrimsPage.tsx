@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import type { PilgrimFilterOptions, PilgrimList, PilgrimStatus } from '../../api/types';
-import { useAsync } from '../../lib/hooks';
+import type { PilgrimFilterOptions, PilgrimList, PilgrimListItem, PilgrimStatus as PilgrimStatusValue } from '../../api/types';
+import { PHONE_QUERY, useAsync, useMediaQuery } from '../../lib/hooks';
 import { documentStatusLabel, formatCount, formatDate } from '../../lib/format';
 import {
   Badge,
@@ -22,6 +22,37 @@ import type { PilgrimListOrigin } from './PilgrimDetailPage';
 const PAGE_SIZE = 20;
 const FILTER_KEYS = ['q', 'tripId', 'delegateId', 'documentStatus'] as const;
 
+/** نشط / مستبعد (with the exclusion date in the table). */
+const PilgrimStatus = ({ pilgrim, withDate = false }: { pilgrim: PilgrimListItem; withDate?: boolean }) =>
+  pilgrim.status === 'CANCELLED' ? (
+    <span>
+      <Badge tone="danger">مستبعد</Badge>
+      {withDate && pilgrim.cancelledAt ? <div className="muted small mono">{formatDate(pilgrim.cancelledAt)}</div> : null}
+    </span>
+  ) : (
+    <Badge tone="success">نشط</Badge>
+  );
+
+/** Row actions shared by the table (icons) and the phone cards (labelled). */
+const PilgrimActions = ({ pilgrim, origin, labelled = false }: { pilgrim: PilgrimListItem; origin: PilgrimListOrigin; labelled?: boolean }) => {
+  const canEdit = pilgrim.status !== 'CANCELLED' && pilgrim.tripCapabilities.canEditPilgrims;
+  const cls = labelled ? 'btn secondary sm' : 'btn ghost sm icon-only';
+  return (
+    <div className={labelled ? 'row' : 'row nowrap'}>
+      <Link className={cls} to={`/pilgrims/${pilgrim.id}`} state={origin} title="ملف المعتمر" aria-label="ملف المعتمر">
+        <Icon name="eye" size={15} />
+        {labelled ? ' ملف المعتمر' : null}
+      </Link>
+      {canEdit ? (
+        <Link className={cls} to={`/pilgrims/${pilgrim.id}/edit`} state={origin} title="تعديل البيانات" aria-label="تعديل البيانات">
+          <Icon name="edit" size={15} />
+          {labelled ? ' تعديل' : null}
+        </Link>
+      ) : null}
+    </div>
+  );
+};
+
 /**
  * Global pilgrim search. Every filter, the status tab and the page live in the
  * URL, so «رجوع» from a pilgrim file returns to the same view. Active pilgrims
@@ -29,8 +60,9 @@ const FILTER_KEYS = ['q', 'tripId', 'delegateId', 'documentStatus'] as const;
  */
 export const PilgrimsPage = () => {
   const location = useLocation();
+  const phone = useMediaQuery(PHONE_QUERY);
   const [params, setParams] = useSearchParams();
-  const status = (params.get('status') as PilgrimStatus | null) ?? 'ACTIVE';
+  const status = (params.get('status') as PilgrimStatusValue | null) ?? 'ACTIVE';
   const tripId = params.get('tripId') ?? '';
   const delegateId = params.get('delegateId') ?? '';
   const documentStatus = params.get('documentStatus') ?? 'ALL';
@@ -197,26 +229,55 @@ export const PilgrimsPage = () => {
             />
           ) : (
             <>
-              <div className={`table-wrap${loading ? ' is-refreshing' : ''}`}>
-                <table className="data dense">
-                  <thead>
-                    <tr>
-                      <th>اسم المعتمر</th>
-                      <th>رقم جواز السفر</th>
-                      <th>الرقم القومي</th>
-                      <th>المندوب</th>
-                      <th>الرحلة</th>
-                      <th>حالة المستندات</th>
-                      <th>الحالة</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.items.map((pilgrim) => {
-                      const cancelled = pilgrim.status === 'CANCELLED';
-                      const canEdit = !cancelled && pilgrim.tripCapabilities.canEditPilgrims;
-                      return (
-                        <tr key={pilgrim.id} className={cancelled ? 'row-voided' : undefined}>
+              {phone ? (
+                // Phones: stacked cards — every action reachable without sideways scrolling.
+                <ul className={`pilgrim-cards${loading ? ' is-refreshing' : ''}`}>
+                  {data.items.map((pilgrim) => (
+                    <li key={pilgrim.id} className={`pilgrim-card${pilgrim.status === 'CANCELLED' ? ' is-cancelled' : ''}`}>
+                      <div className="pilgrim-card-head">
+                        <Link to={`/pilgrims/${pilgrim.id}`} state={origin}>
+                          <strong>{pilgrim.name}</strong>
+                        </Link>
+                        <PilgrimStatus pilgrim={pilgrim} />
+                      </div>
+                      <dl className="pilgrim-card-meta">
+                        <dt>رقم جواز السفر</dt>
+                        <dd className="mono">{pilgrim.passportNumber}</dd>
+                        <dt>المندوب</dt>
+                        <dd>{pilgrim.delegate.name}</dd>
+                        <dt>الرحلة</dt>
+                        <dd>
+                          {pilgrim.trip?.name ?? '—'}
+                          {pilgrim.trip?.departureDate ? <span className="muted mono"> — {formatDate(pilgrim.trip.departureDate)}</span> : null}
+                        </dd>
+                      </dl>
+                      <div className="pilgrim-card-foot">
+                        <Badge tone={pilgrim.documentStatus === 'COMPLETE' ? 'success' : 'warning'}>
+                          {documentStatusLabel[pilgrim.documentStatus]}
+                        </Badge>
+                        <PilgrimActions pilgrim={pilgrim} origin={origin} labelled />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className={`table-wrap${loading ? ' is-refreshing' : ''}`}>
+                  <table className="data dense">
+                    <thead>
+                      <tr>
+                        <th>اسم المعتمر</th>
+                        <th>رقم جواز السفر</th>
+                        <th>الرقم القومي</th>
+                        <th>المندوب</th>
+                        <th>الرحلة</th>
+                        <th>حالة المستندات</th>
+                        <th>الحالة</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.items.map((pilgrim) => (
+                        <tr key={pilgrim.id} className={pilgrim.status === 'CANCELLED' ? 'row-voided' : undefined}>
                           <td className="name-cell">
                             <Link to={`/pilgrims/${pilgrim.id}`} state={origin}>
                               <strong>{pilgrim.name}</strong>
@@ -237,35 +298,17 @@ export const PilgrimsPage = () => {
                             </Badge>
                           </td>
                           <td>
-                            {cancelled ? (
-                              <>
-                                <Badge tone="danger">مستبعد</Badge>
-                                {pilgrim.cancelledAt ? (
-                                  <div className="muted small mono">{formatDate(pilgrim.cancelledAt)}</div>
-                                ) : null}
-                              </>
-                            ) : (
-                              <Badge tone="success">نشط</Badge>
-                            )}
+                            <PilgrimStatus pilgrim={pilgrim} withDate />
                           </td>
                           <td>
-                            <div className="row nowrap">
-                              <Link className="btn ghost sm icon-only" to={`/pilgrims/${pilgrim.id}`} state={origin} title="ملف المعتمر" aria-label="ملف المعتمر">
-                                <Icon name="eye" size={15} />
-                              </Link>
-                              {canEdit ? (
-                                <Link className="btn ghost sm icon-only" to={`/pilgrims/${pilgrim.id}/edit`} state={origin} title="تعديل البيانات" aria-label="تعديل البيانات">
-                                  <Icon name="edit" size={15} />
-                                </Link>
-                              ) : null}
-                            </div>
+                            <PilgrimActions pilgrim={pilgrim} origin={origin} />
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <Pagination {...data.meta} onPage={(next) => update({ page: String(next) }, true)} />
             </>
           )

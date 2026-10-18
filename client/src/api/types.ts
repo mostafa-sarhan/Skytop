@@ -401,6 +401,8 @@ export interface AuditLog {
   newData: unknown;
   createdAt: string;
   user: { id: string; fullName: string; username: string; role: Role };
+  /** Readable reference resolved on the server (null if none). */
+  reference: { title: string; subtitle?: string } | null;
 }
 
 export interface ReportMeta {

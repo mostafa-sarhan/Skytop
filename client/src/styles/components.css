@@ -1643,3 +1643,77 @@ table.data td.name-cell {
   min-width: 128px;
   max-width: 220px;
 }
+
+/* Dashboard money: amount and «جنيه» stay together; very large values scale
+   down with the card width (container query) instead of wrapping. */
+.dashboard .stat-card {
+  container-type: inline-size;
+}
+
+.money-value {
+  white-space: nowrap;
+  font-size: min(1em, 10.5cqi);
+}
+
+/* Phone: pilgrim lists as stacked cards (desktop/tablet keep the table). */
+.pilgrim-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pilgrim-card {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pilgrim-card:last-child {
+  border-bottom: 0;
+}
+
+.pilgrim-card.is-cancelled {
+  background: var(--surface-2);
+}
+
+.pilgrim-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pilgrim-card-head a {
+  overflow-wrap: anywhere;
+}
+
+.pilgrim-card-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.pilgrim-card-meta dt {
+  color: var(--text-muted);
+}
+
+.pilgrim-card-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.pilgrim-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pilgrim-card-foot .row {
+  gap: 6px;
+}

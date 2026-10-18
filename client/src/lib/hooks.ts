@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { ApiError } from '../api/client';
 import { useDebouncedValue } from '../ui/primitives';
 
@@ -96,3 +96,17 @@ export const validationMessages = (error: unknown): Record<string, string> => {
   }
   return map;
 };
+
+/** True while the media query matches (e.g. phones: '(max-width: 640px)'). */
+export const useMediaQuery = (query: string): boolean =>
+  useSyncExternalStore(
+    (onChange) => {
+      const list = window.matchMedia(query);
+      list.addEventListener('change', onChange);
+      return () => list.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+
+export const PHONE_QUERY = '(max-width: 640px)';

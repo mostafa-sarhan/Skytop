@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { DelegateTripPilgrim, DelegateTripPilgrims, PilgrimStatus } from '../../api/types';
-import { useAsync } from '../../lib/hooks';
+import { PHONE_QUERY, useAsync, useMediaQuery } from '../../lib/hooks';
 import {
   documentStatusLabel,
   flightTypeLabel,
@@ -34,6 +34,7 @@ import { PassengerListExport } from '../../components/PassengerListExport';
 export const DelegateTripPilgrimsPage = () => {
   const { delegateId = '', tripId = '' } = useParams();
   const navigate = useNavigate();
+  const phone = useMediaQuery(PHONE_QUERY);
   const [view, setView] = useState<PilgrimStatus>('ACTIVE');
   const [search, setSearch] = useState('');
   const [docFilter, setDocFilter] = useState<'ALL' | 'INCOMPLETE'>('ALL');
@@ -101,6 +102,49 @@ export const DelegateTripPilgrimsPage = () => {
   const canCancel = can.canCancelPilgrims;
   const canEdit = can.canEditPilgrims;
   const canTransfer = can.canChangeManifest;
+
+  /** Actions shared by the table (icons + tooltips) and the phone cards (labelled). */
+  const renderActions = (pilgrim: DelegateTripPilgrim, labelled: boolean) => {
+    const cls = labelled ? 'btn secondary sm' : 'btn ghost sm icon-only';
+    const label = (text: string) => (labelled ? ` ${text}` : null);
+    if (pilgrim.status === 'CANCELLED') {
+      return (
+        <Link className={labelled ? cls : 'btn ghost sm'} to={`${base}/${pilgrim.id}`}>
+          <Icon name="eye" size={14} /> عرض
+        </Link>
+      );
+    }
+    return (
+      <div className={labelled ? 'row' : 'row nowrap row-actions'}>
+        <Link className={cls} to={`${base}/${pilgrim.id}`} title="ملف المعتمر" aria-label="ملف المعتمر">
+          <Icon name="eye" size={15} />
+          {label('الملف')}
+        </Link>
+        {canEdit ? (
+          <Link className={cls} to={`${base}/${pilgrim.id}/edit`} title="تعديل البيانات" aria-label="تعديل البيانات">
+            <Icon name="edit" size={15} />
+            {label('تعديل')}
+          </Link>
+        ) : null}
+        <button type="button" className={cls} title="المستندات" aria-label="المستندات" onClick={() => navigate(`${base}/${pilgrim.id}#documents`)}>
+          <Icon name="file" size={15} />
+          {label('المستندات')}
+        </button>
+        {canTransfer ? (
+          <button type="button" className={cls} title="نقل إلى رحلة أخرى" aria-label="نقل إلى رحلة أخرى" onClick={() => setTransferring(pilgrim)}>
+            <Icon name="refresh" size={15} />
+            {label('نقل')}
+          </button>
+        ) : null}
+        {canCancel ? (
+          <button type="button" className={`${cls} danger-text`} title="استبعاد" aria-label="استبعاد" onClick={() => setCancelling(pilgrim)}>
+            <Icon name="trash" size={15} />
+            {label('استبعاد')}
+          </button>
+        ) : null}
+      </div>
+    );
+  };
   const showingCancelled = data.status === 'CANCELLED';
 
   return (
@@ -210,6 +254,44 @@ export const DelegateTripPilgrimsPage = () => {
           )
         ) : !loading && rows.length === 0 ? (
           <EmptyState title="لا توجد نتائج مطابقة" />
+        ) : !loading && phone ? (
+          // Phones: stacked cards — every action reachable without sideways scrolling.
+          <ul className="pilgrim-cards">
+            {rows.map((pilgrim, index) => (
+              <li key={pilgrim.id} className={`pilgrim-card${pilgrim.status === 'CANCELLED' ? ' is-cancelled' : ''}`}>
+                <div className="pilgrim-card-head">
+                  <Link to={`${base}/${pilgrim.id}`}>
+                    <span className="muted mono">{index + 1}.</span> <strong>{pilgrim.name}</strong>
+                  </Link>
+                  {pilgrim.status === 'CANCELLED' ? <Badge tone="danger">مستبعد</Badge> : <Badge tone="success">نشط</Badge>}
+                </div>
+                <dl className="pilgrim-card-meta">
+                  <dt>رقم الجواز</dt>
+                  <dd className="mono">{pilgrim.passportNumber}</dd>
+                  <dt>الرقم القومي</dt>
+                  <dd className="mono">{pilgrim.nationalId ?? '—'}</dd>
+                  {pilgrim.status === 'CANCELLED' ? (
+                    <>
+                      <dt>تاريخ الاستبعاد</dt>
+                      <dd className="mono">{pilgrim.cancelledAt ? formatDateTime(pilgrim.cancelledAt) : '—'}</dd>
+                      <dt>السبب</dt>
+                      <dd>{pilgrim.cancelReason ?? '—'}</dd>
+                    </>
+                  ) : null}
+                </dl>
+                <div className="pilgrim-card-foot">
+                  {pilgrim.status === 'CANCELLED' ? (
+                    <span />
+                  ) : (
+                    <Badge tone={pilgrim.documentStatus === 'COMPLETE' ? 'success' : 'warning'}>
+                      {documentStatusLabel[pilgrim.documentStatus]}
+                    </Badge>
+                  )}
+                  {renderActions(pilgrim, true)}
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : !loading && showingCancelled ? (
           <div className="table-wrap">
             <table className="data">
@@ -243,11 +325,7 @@ export const DelegateTripPilgrimsPage = () => {
                     <td className="mono">{pilgrim.cancelledAt ? formatDateTime(pilgrim.cancelledAt) : '—'}</td>
                     <td className="wrap">{pilgrim.cancelReason ?? '—'}</td>
                     <td>{pilgrim.cancelledBy?.fullName ?? '—'}</td>
-                    <td>
-                      <Link className="btn ghost sm" to={`${base}/${pilgrim.id}`}>
-                        <Icon name="eye" size={14} /> عرض
-                      </Link>
-                    </td>
+                    <td>{renderActions(pilgrim, false)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -287,48 +365,7 @@ export const DelegateTripPilgrimsPage = () => {
                       </Badge>
                     </td>
                     <td>
-                      {/* Compact icon actions (Arabic tooltips + labels) on one line. */}
-                      <div className="row nowrap row-actions">
-                        <Link className="btn ghost sm icon-only" to={`${base}/${pilgrim.id}`} title="ملف المعتمر" aria-label="ملف المعتمر">
-                          <Icon name="eye" size={15} />
-                        </Link>
-                        {canEdit ? (
-                          <Link className="btn ghost sm icon-only" to={`${base}/${pilgrim.id}/edit`} title="تعديل البيانات" aria-label="تعديل البيانات">
-                            <Icon name="edit" size={15} />
-                          </Link>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="btn ghost sm icon-only"
-                          title="المستندات"
-                          aria-label="المستندات"
-                          onClick={() => navigate(`${base}/${pilgrim.id}#documents`)}
-                        >
-                          <Icon name="file" size={15} />
-                        </button>
-                        {canTransfer ? (
-                          <button
-                            type="button"
-                            className="btn ghost sm icon-only"
-                            title="نقل إلى رحلة أخرى"
-                            aria-label="نقل إلى رحلة أخرى"
-                            onClick={() => setTransferring(pilgrim)}
-                          >
-                            <Icon name="refresh" size={15} />
-                          </button>
-                        ) : null}
-                        {canCancel ? (
-                          <button
-                            type="button"
-                            className="btn ghost sm icon-only danger-text"
-                            title="استبعاد"
-                            aria-label="استبعاد"
-                            onClick={() => setCancelling(pilgrim)}
-                          >
-                            <Icon name="trash" size={15} />
-                          </button>
-                        ) : null}
-                      </div>
+                      {renderActions(pilgrim, false)}
                     </td>
                   </tr>
                 ))}

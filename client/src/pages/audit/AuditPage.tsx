@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import type { AuditLog, Paginated } from '../../api/types';
 import { useAsync, useListState } from '../../lib/hooks';
-import { auditActionLabel, formatDateTime, roleLabel } from '../../lib/format';
+import { auditActionLabel, auditEntityLabel, formatDateTime, roleLabel } from '../../lib/format';
 import {
   Badge,
   EmptyState,
@@ -58,12 +58,12 @@ export const AuditPage = () => {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-body">
           <div className="filters">
-            <Field label="بحث بالكيان">
+            <Field label="بحث">
               <TextInput
                 className="input-search"
                 value={list.search}
                 onChange={(event) => list.setSearch(event.target.value)}
-                placeholder="رقم المعرّف أو الاسم"
+                placeholder="اسم، رقم إيصال، سبب..."
               />
             </Field>
             <Field label="نوع العملية">
@@ -95,8 +95,8 @@ export const AuditPage = () => {
                       <th>التاريخ</th>
                       <th>المستخدم</th>
                       <th>العملية</th>
-                      <th>الكيان</th>
-                      <th>التفاصيل</th>
+                      <th>النوع</th>
+                      <th>المرجع</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -111,8 +111,17 @@ export const AuditPage = () => {
                         <td>
                           <Badge tone="primary">{auditActionLabel[log.action] ?? log.action}</Badge>
                         </td>
-                        <td>{log.entityType}</td>
-                        <td className="mono small">{log.entityId ?? '—'}</td>
+                        <td>{auditEntityLabel[log.entityType] ?? 'سجل'}</td>
+                        <td className="wrap">
+                          {log.reference ? (
+                            <>
+                              <strong>{log.reference.title}</strong>
+                              {log.reference.subtitle ? <div className="muted small">{log.reference.subtitle}</div> : null}
+                            </>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
                         <td>
                           <button type="button" className="btn ghost sm" onClick={() => setSelected(log)}>
                             <Icon name="eye" size={14} /> عرض
@@ -134,10 +143,13 @@ export const AuditPage = () => {
           <dl className="kv">
             <dt>العملية</dt>
             <dd>{auditActionLabel[selected.action] ?? selected.action}</dd>
-            <dt>الكيان</dt>
-            <dd>{selected.entityType}</dd>
-            <dt>المعرّف</dt>
-            <dd className="mono">{selected.entityId ?? '—'}</dd>
+            <dt>النوع</dt>
+            <dd>{auditEntityLabel[selected.entityType] ?? 'سجل'}</dd>
+            <dt>المرجع</dt>
+            <dd>
+              {selected.reference?.title ?? '—'}
+              {selected.reference?.subtitle ? <div className="muted small">{selected.reference.subtitle}</div> : null}
+            </dd>
             <dt>المستخدم</dt>
             <dd>
               {selected.user.fullName} ({selected.user.username})
@@ -145,9 +157,16 @@ export const AuditPage = () => {
             <dt>الوقت</dt>
             <dd className="mono">{formatDateTime(selected.createdAt)}</dd>
           </dl>
+          <h3 style={{ margin: '16px 0 4px' }}>البيانات الفنية</h3>
+          <p className="muted small" style={{ marginTop: 0 }}>
+            القيم كما سُجّلت في النظام وقت العملية — المعرّف الفني:{' '}
+            <span className="mono" dir="ltr">
+              {selected.entityId ?? '—'}
+            </span>
+          </p>
           <div className="grid cols-2">
             <div>
-              <h3 style={{ marginBottom: 8 }}>البيانات السابقة</h3>
+              <h3 style={{ marginBottom: 8 }}>قبل العملية</h3>
               <pre
                 className="mono small"
                 style={{
@@ -163,7 +182,7 @@ export const AuditPage = () => {
               </pre>
             </div>
             <div>
-              <h3 style={{ marginBottom: 8 }}>البيانات الجديدة</h3>
+              <h3 style={{ marginBottom: 8 }}>بعد العملية</h3>
               <pre
                 className="mono small"
                 style={{
