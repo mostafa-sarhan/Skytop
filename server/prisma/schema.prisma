@@ -1,0 +1,357 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  EMPLOYEE
+  MANAGER
+}
+
+enum DelegateStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TripStatus {
+  OPEN
+  CLOSED
+  COMPLETED
+}
+
+enum FlightType {
+  DIRECT
+  INDIRECT
+}
+
+enum DocumentType {
+  PASSPORT_IMAGE
+  PERSONAL_PHOTO
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+}
+
+enum TransferType {
+  INSTAPAY
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  ACTIVE
+  VOIDED
+}
+
+/// Operational status only. A cancelled pilgrim keeps its history but no
+/// longer counts toward the delegate's required amount.
+enum PilgrimStatus {
+  ACTIVE
+  CANCELLED
+}
+
+/// Manager-only financial exceptions. Voids are not adjustments: a voided
+/// payment is simply Payment.status = VOIDED.
+enum FinancialAdjustmentType {
+  REFUND
+  CORRECTION
+}
+
+/// Effect of a correction on what the delegate owes:
+/// INCREASE = إضافة على الحساب, DECREASE = خصم من الحساب.
+enum AdjustmentDirection {
+  INCREASE
+  DECREASE
+}
+
+enum AuditAction {
+  DELEGATE_PRICE_CHANGE
+  PAYMENT_VOID
+  REFUND
+  FINANCIAL_CORRECTION
+  PILGRIM_TRANSFER
+  PILGRIM_CANCELLED
+  USER_CREATED
+  USER_ROLE_CHANGED
+  USER_ACTIVATED
+  USER_DEACTIVATED
+  PASSWORD_RESET
+  DELEGATE_CREATED
+  DELEGATE_UPDATED
+  DELEGATE_STATUS_CHANGED
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access
+// ---------------------------------------------------------------------------
+
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  fullName           String    @db.VarChar(160)
+  username           String    @unique @db.VarChar(80)
+  passwordHash       String
+  role               Role      @default(EMPLOYEE)
+  isActive           Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  lastLoginAt        DateTime?
+  passwordResetAt    DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  payments          Payment[]             @relation("PaymentCreatedBy")
+  transfers         PilgrimTransfer[]     @relation("TransferPerformedBy")
+  uploads           PilgrimDocument[]     @relation("DocumentUploadedBy")
+  auditLogs         AuditLog[]            @relation("AuditLogUser")
+  adjustments       FinancialAdjustment[] @relation("AdjustmentPerformedBy")
+  voidedPayments    Payment[]             @relation("PaymentVoidedBy")
+  cancelledPilgrims Pilgrim[]             @relation("PilgrimCancelledBy")
+
+  @@index([role])
+  @@index([isActive])
+}
+
+// ---------------------------------------------------------------------------
+// Core operational entities
+// ---------------------------------------------------------------------------
+
+model Delegate {
+  id        String         @id @default(uuid()) @db.Uuid
+  name      String         @db.VarChar(160)
+  phone     String         @db.VarChar(40)
+  address   String         @db.VarChar(255)
+  status    DelegateStatus @default(ACTIVE)
+  notes     String?
+  isSystem  Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  pilgrims    Pilgrim[]
+  trips       DelegateTrip[]
+  payments    Payment[]
+  adjustments FinancialAdjustment[]
+
+  @@index([status])
+  @@index([name])
+  @@index([phone])
+}
+
+model Trip {
+  id            String     @id @default(uuid()) @db.Uuid
+  name          String     @db.VarChar(160)
+  departureDate DateTime   @db.Date
+  returnDate    DateTime   @db.Date
+  flightType    FlightType
+  status        TripStatus @default(OPEN)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  delegates    DelegateTrip[]
+  pilgrims     Pilgrim[]
+  transfersOut PilgrimTransfer[] @relation("TransferFromTrip")
+  transfersIn  PilgrimTransfer[] @relation("TransferToTrip")
+
+  @@index([status])
+  @@index([departureDate])
+  @@index([name])
+}
+
+/// Join model: a delegate participates in a trip at a negotiated per-person price.
+model DelegateTrip {
+  id             String   @id @default(uuid()) @db.Uuid
+  delegateId     String   @db.Uuid
+  tripId         String   @db.Uuid
+  pricePerPerson Decimal  @db.Decimal(14, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  delegate Delegate @relation(fields: [delegateId], references: [id], onDelete: Restrict)
+  trip     Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([delegateId, tripId])
+  @@index([tripId])
+}
+
+model Pilgrim {
+  id             String        @id @default(uuid()) @db.Uuid
+  name           String        @db.VarChar(160)
+  passportNumber String        @db.VarChar(40)
+  nationalId     String?       @db.VarChar(40)
+  birthDate      DateTime?     @db.Date
+  job            String?       @db.VarChar(120)
+  notes          String?
+  delegateId     String        @db.Uuid
+  tripId         String        @db.Uuid
+  status         PilgrimStatus @default(ACTIVE)
+  cancelledAt    DateTime?
+  cancelledById  String?       @db.Uuid
+  cancelReason   String?       @db.VarChar(500)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  delegate    Delegate          @relation(fields: [delegateId], references: [id], onDelete: Restrict)
+  trip        Trip              @relation(fields: [tripId], references: [id], onDelete: Restrict)
+  cancelledBy User?             @relation("PilgrimCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  documents   PilgrimDocument[]
+  transfers   PilgrimTransfer[]
+
+  // Same person cannot be booked twice inside the same trip, but data is not
+  // globally locked so historical / cross-trip records stay unblocked.
+  @@unique([tripId, passportNumber])
+  @@unique([tripId, nationalId])
+  @@index([delegateId])
+  @@index([tripId])
+  @@index([delegateId, tripId, status])
+  @@index([name])
+}
+
+model PilgrimTransfer {
+  id            String   @id @default(uuid()) @db.Uuid
+  pilgrimId     String   @db.Uuid
+  fromTripId    String   @db.Uuid
+  toTripId      String   @db.Uuid
+  reason        String?
+  performedById String   @db.Uuid
+  createdAt     DateTime @default(now())
+
+  pilgrim     Pilgrim @relation(fields: [pilgrimId], references: [id], onDelete: Restrict)
+  fromTrip    Trip    @relation("TransferFromTrip", fields: [fromTripId], references: [id], onDelete: Restrict)
+  toTrip      Trip    @relation("TransferToTrip", fields: [toTripId], references: [id], onDelete: Restrict)
+  performedBy User    @relation("TransferPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+
+  @@index([pilgrimId])
+  @@index([fromTripId])
+  @@index([toTripId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Documents (private storage)
+// ---------------------------------------------------------------------------
+
+model PilgrimDocument {
+  id           String       @id @default(uuid()) @db.Uuid
+  pilgrimId    String       @db.Uuid
+  type         DocumentType
+  fileName     String       @db.VarChar(255)
+  originalName String       @db.VarChar(255)
+  mimeType     String       @db.VarChar(120)
+  sizeBytes    Int
+  storageKey   String       @unique @db.VarChar(300)
+  uploadedById String       @db.Uuid
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  pilgrim    Pilgrim @relation(fields: [pilgrimId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation("DocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@unique([pilgrimId, type])
+  @@index([pilgrimId])
+}
+
+// ---------------------------------------------------------------------------
+// Finance
+// ---------------------------------------------------------------------------
+
+/// A delegate payment backed by a physical company paper receipt. The receipt
+/// number is entered by the employee; the application never generates it.
+model Payment {
+  id                      String        @id @default(uuid()) @db.Uuid
+  delegateId              String        @db.Uuid
+  amount                  Decimal       @db.Decimal(14, 2)
+  /// Physical receipt number as entered (trimmed / normalized).
+  receiptNumber           String?       @db.VarChar(40)
+  /// Permanent normalized receipt identity. Unique across ALL payments
+  /// regardless of status: a paper receipt number is reserved forever once
+  /// recorded, even if the payment is later voided. Built only by receiptKey()
+  /// so a receipt-book identifier can later be folded in.
+  receiptKey              String?       @unique @db.VarChar(120)
+  /// Number of a pre-migration system-generated receipt (REC-...). Legacy only.
+  legacyReceiptNumber     String?       @db.VarChar(24)
+  receiptScanKey          String?       @unique @db.VarChar(300)
+  receiptScanMimeType     String?       @db.VarChar(120)
+  receiptScanOriginalName String?       @db.VarChar(255)
+  receiptScanSizeBytes    Int?
+  paymentMethod           PaymentMethod
+  transferType            TransferType?
+  referenceNumber         String?       @db.VarChar(120)
+  paymentDate             DateTime      @db.Date
+  notes                   String?
+  status                  PaymentStatus @default(ACTIVE)
+  createdById             String        @db.Uuid
+  voidedById              String?       @db.Uuid
+  voidedAt                DateTime?
+  voidReason              String?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  delegate    Delegate              @relation(fields: [delegateId], references: [id], onDelete: Restrict)
+  createdBy   User                  @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  voidedBy    User?                 @relation("PaymentVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
+  adjustments FinancialAdjustment[] @relation("AdjustmentRelatedPayment")
+
+  @@index([delegateId, createdAt])
+  @@index([status])
+  @@index([paymentDate])
+  @@index([createdById])
+  @@index([receiptNumber])
+}
+
+/// Explicit manager refunds / corrections. Together with DelegateTrip ×
+/// active pilgrims and ACTIVE payments this is the whole delegate account:
+///   REFUND               → money returned to the delegate (reduces paid)
+///   CORRECTION INCREASE  → adds to what the delegate owes
+///   CORRECTION DECREASE  → deducts from what the delegate owes
+/// Rows are never updated or deleted.
+model FinancialAdjustment {
+  id               String                  @id @default(uuid()) @db.Uuid
+  type             FinancialAdjustmentType
+  /// Required for CORRECTION, NULL for REFUND.
+  direction        AdjustmentDirection?
+  delegateId       String                  @db.Uuid
+  amount           Decimal                 @db.Decimal(14, 2)
+  reason           String                  @db.VarChar(500)
+  /// Business date of the action (refund date; creation date for corrections).
+  effectiveDate    DateTime                @db.Date
+  relatedPaymentId String?                 @db.Uuid
+  performedById    String                  @db.Uuid
+  createdAt        DateTime                @default(now())
+
+  delegate       Delegate @relation(fields: [delegateId], references: [id], onDelete: Restrict)
+  relatedPayment Payment? @relation("AdjustmentRelatedPayment", fields: [relatedPaymentId], references: [id], onDelete: SetNull)
+  performedBy    User     @relation("AdjustmentPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+
+  @@index([delegateId, createdAt])
+  @@index([type])
+  @@index([relatedPaymentId])
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         String      @id @default(uuid()) @db.Uuid
+  userId     String      @db.Uuid
+  action     AuditAction
+  entityType String      @db.VarChar(60)
+  entityId   String      @db.Uuid
+  oldData    Json?
+  newData    Json?
+  createdAt  DateTime    @default(now())
+
+  user User @relation("AuditLogUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}

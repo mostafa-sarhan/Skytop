@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#7422f0" />
+    <style>
+      /* First-frame background before the stylesheet loads (matches --bg). */
+      html[data-theme='dark'] { background: #13111b; color-scheme: dark; }
+    </style>
+    <script>
+      // Apply the saved theme (or the OS preference) before the first paint to
+      // avoid a light/dark flash. Mirrors resolveInitialTheme() in
+      // src/theme/theme.ts — keep the storage key in sync.
+      (function () {
+        var theme;
+        try {
+          theme = localStorage.getItem('skytop-theme');
+        } catch (e) {}
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', theme);
+        if (theme === 'dark') {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#1b1826');
+        }
+      })();
+    </script>
+    <meta
+      name="description"
+      content="سكاي توب — نظام الإدارة الداخلية لإدارة الرحلات والمعتمرين والمندوبين والتحصيل المالي"
+    />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <title>سكاي توب | نظام الإدارة الداخلية</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

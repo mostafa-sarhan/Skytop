@@ -1,0 +1,293 @@
+/* Sky Top Travel — base / reset / typography / utilities */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  line-height: 1.7;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--brand-200);
+  color: var(--brand-950);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.45;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--fs-page);
+}
+h2 {
+  font-size: var(--fs-md);
+}
+h3 {
+  font-size: var(--fs-md);
+}
+h4 {
+  font-size: var(--fs-base);
+}
+
+p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+a {
+  color: var(--primary-text);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+a:hover {
+  color: var(--brand-800);
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+kbd {
+  font-family: var(--font);
+  font-size: 11px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--r-xs);
+  padding: 1px 6px;
+  color: var(--text-muted);
+}
+
+/* scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--r-full);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: content-box;
+}
+
+/* ----------------------------------------------------------------- helpers */
+
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: var(--fs-sm);
+}
+
+.xsmall {
+  font-size: var(--fs-xs);
+}
+
+.strong {
+  font-weight: 700;
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+.nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.stack.tight {
+  gap: var(--sp-3);
+}
+
+.stack.loose {
+  gap: var(--sp-5);
+}
+
+.row {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+.row.nowrap {
+  flex-wrap: nowrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.mt-0 {
+  margin-top: 0;
+}
+.mt-2 {
+  margin-top: var(--sp-2);
+}
+.mt-3 {
+  margin-top: var(--sp-3);
+}
+.mt-4 {
+  margin-top: var(--sp-4);
+}
+.mt-5 {
+  margin-top: var(--sp-5);
+}
+.mt-6 {
+  margin-top: var(--sp-6);
+}
+.mb-2 {
+  margin-bottom: var(--sp-2);
+}
+.mb-3 {
+  margin-bottom: var(--sp-3);
+}
+.mb-4 {
+  margin-bottom: var(--sp-4);
+}
+.mb-5 {
+  margin-bottom: var(--sp-5);
+}
+.text-end {
+  text-align: end;
+}
+.text-center {
+  text-align: center;
+}
+.w-full {
+  width: 100%;
+}
+
+/* skeleton loading */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: var(--r-sm);
+  height: 14px;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--skeleton-shine),
+    transparent
+  );
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .sidebar,
+  .topbar,
+  .page-actions,
+  .filters,
+  .pagination {
+    display: none !important;
+  }
+  .app-shell {
+    display: block;
+  }
+  body {
+    background: #fff;
+  }
+}

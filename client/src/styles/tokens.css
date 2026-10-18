@@ -1,0 +1,214 @@
+/* Sky Top Travel — design tokens */
+
+:root {
+  /* brand purple (from Sky Top logo) */
+  --brand-50: #f6f2ff;
+  --brand-100: #ece4ff;
+  --brand-200: #dbcdff;
+  --brand-300: #c1a8ff;
+  --brand-400: #a475ff;
+  --brand-500: #863bff;
+  --brand-600: #7422f0;
+  --brand-700: #6216cf;
+  --brand-800: #5214a8;
+  --brand-900: #441487;
+  --brand-950: #2a0758;
+
+  /* fixed deep-purple brand panel (login hero) — identical in both themes */
+  --brand-hero-1: #6216cf;
+  --brand-hero-2: #441487;
+  --brand-hero-3: #2a0758;
+
+  /* primary = brand */
+  --primary: var(--brand-600);
+  --primary-hover: var(--brand-700);
+  --primary-active: var(--brand-800);
+  --primary-strong: var(--brand-700);
+  --primary-soft: var(--brand-50);
+  --primary-soft-strong: var(--brand-100);
+  --primary-ring: rgba(134, 59, 255, 0.18);
+  --primary-text: var(--brand-700);
+
+  /* neutrals — violet-tinted greys */
+  --bg: #f7f7fb;
+  --bg-deep: #f1f0f7;
+  --surface: #ffffff;
+  --surface-2: #faf9fd;
+  --surface-3: #f4f2f9;
+  --border: #ecebf3;
+  --border-strong: #dcd9e8;
+  --border-focus: var(--brand-400);
+  --text: #1a1625;
+  --text-secondary: #454059;
+  --text-muted: #57516b;
+  --text-soft: #6f6985;
+
+  /* status */
+  --success: #15803d;
+  --success-strong: #166534;
+  --success-soft: #e9f8ef;
+  --success-border: #c7ecd5;
+  --warning: #b45309;
+  --warning-strong: #92400e;
+  --warning-soft: #fdf4e7;
+  --warning-border: #f7e3c3;
+  --danger: #d92d20;
+  --danger-strong: #b42318;
+  --danger-soft: #feeeec;
+  --danger-border: #f8d3cf;
+  --info: #2563eb;
+  --info-strong: #1d4ed8;
+  --info-soft: #eaf0ff;
+  --info-border: #cfdcff;
+
+  /* spacing scale (4px base) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+  --sp-9: 56px;
+
+  /* radius */
+  --r-xs: 6px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  /* elevation */
+  --shadow-xs: 0 1px 2px rgba(26, 22, 37, 0.05);
+  --shadow-sm: 0 1px 2px rgba(26, 22, 37, 0.05), 0 2px 6px -2px rgba(26, 22, 37, 0.06);
+  --shadow-md: 0 4px 14px -4px rgba(26, 22, 37, 0.1), 0 2px 6px -3px rgba(26, 22, 37, 0.06);
+  --shadow-lg: 0 20px 44px -16px rgba(26, 22, 37, 0.24), 0 6px 14px -8px rgba(26, 22, 37, 0.14);
+  --shadow: var(--shadow-sm);
+
+  /* typography */
+  --font: 'Cairo Variable', 'Cairo', 'Segoe UI', 'Helvetica Neue', Tahoma,
+    'Noto Sans Arabic', Arial, sans-serif;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-base: 14.5px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-page: clamp(21px, 1.6vw, 24px);
+  --fs-display: clamp(26px, 2.4vw, 32px);
+
+  /* layout */
+  --sidebar-width: 268px;
+  --topbar-height: 60px;
+  --content-max: 1440px;
+
+  /* motion */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-fast: 0.14s;
+  --dur: 0.2s;
+
+  /* surfaces that used to be hard-coded */
+  --topbar-bg: rgba(255, 255, 255, 0.88);
+  --overlay: rgba(26, 22, 31, 0.55);
+  --border-hover: #c9c3dc;
+  --input-invalid-bg: #fffcfc;
+  --danger-ring: rgba(217, 45, 32, 0.14);
+  --skeleton-shine: rgba(255, 255, 255, 0.75);
+  --scrollbar-thumb-hover: #c3bed6;
+  --on-primary: #ffffff;
+  /* filled danger buttons (white text) — separate from the status red */
+  --danger-solid: #d92d20;
+  --danger-solid-hover: #b42318;
+
+  /* the real logo has an opaque white background: plate it only when needed */
+  --logo-plate: transparent;
+  --logo-plate-padding: 0;
+
+  color-scheme: light;
+}
+
+/*
+ * Dark theme — set by <html data-theme="dark"> (see src/theme/theme.ts).
+ * Screen only: print and PDF output always use the light tokens above.
+ *
+ * The brand scale is mirrored so components that use the light tints as soft
+ * backgrounds (--brand-50/100/200) and the deep shades as text
+ * (--brand-700/800/950) stay readable without per-component dark rules.
+ * The primary button keeps the real Sky Top purple.
+ */
+@media screen {
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+
+    --brand-50: #221a36;
+    --brand-100: #2b2045;
+    --brand-200: #3b2c60;
+    --brand-300: #5b4396;
+    --brand-400: #a475ff;
+    --brand-500: #9a66ff;
+    --brand-600: #b08aff;
+    --brand-700: #c3a6ff;
+    --brand-800: #d6c4ff;
+    --brand-900: #e6dbff;
+    --brand-950: #f1ebff;
+
+    --primary: #7422f0;
+    --primary-hover: #8237f7;
+    --primary-active: #6216cf;
+    --primary-strong: #c3a6ff;
+    --primary-soft: #221a36;
+    --primary-soft-strong: #2b2045;
+    --primary-ring: rgba(164, 117, 255, 0.35);
+    --primary-text: #c3a6ff;
+
+    /* neutrals — dark, slightly purple-tinted (never pure black) */
+    --bg: #13111b;
+    --bg-deep: #0f0d16;
+    --surface: #1b1826;
+    --surface-2: #211d2e;
+    --surface-3: #2a2539;
+    --border: #2f2a40;
+    --border-strong: #3f3854;
+    --border-focus: #a475ff;
+    --text: #ece9f5;
+    --text-secondary: #cbc5dc;
+    --text-muted: #a8a1bd;
+    --text-soft: #8c85a3;
+
+    --success: #4ade80;
+    --success-strong: #86efac;
+    --success-soft: #12271c;
+    --success-border: #1f4a33;
+    --warning: #f5b453;
+    --warning-strong: #fcd38a;
+    --warning-soft: #2b2113;
+    --warning-border: #5b4222;
+    --danger: #f87171;
+    --danger-strong: #fca5a5;
+    --danger-soft: #2d1518;
+    --danger-border: #5e2429;
+    --info: #7aa2ff;
+    --info-strong: #a9c2ff;
+    --info-soft: #141d36;
+    --info-border: #263a6b;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 14px -4px rgba(0, 0, 0, 0.5), 0 2px 6px -3px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 20px 44px -16px rgba(0, 0, 0, 0.65), 0 6px 14px -8px rgba(0, 0, 0, 0.5);
+
+    --topbar-bg: rgba(27, 24, 38, 0.86);
+    --overlay: rgba(6, 4, 12, 0.66);
+    --border-hover: #4b4363;
+    --input-invalid-bg: #26141a;
+    --danger-ring: rgba(248, 113, 113, 0.28);
+    --skeleton-shine: rgba(255, 255, 255, 0.06);
+    --scrollbar-thumb-hover: #4b4363;
+    --danger-solid: #c42b20;
+    --danger-solid-hover: #a3231a;
+
+    --logo-plate: #ffffff;
+    --logo-plate-padding: 4px 7px;
+  }
+}
