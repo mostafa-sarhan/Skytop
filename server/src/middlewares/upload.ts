@@ -48,7 +48,7 @@ const fixFileNames = (req: Parameters<RequestHandler>[0]) => {
 
 /** Runs a multer handler and turns its errors into clear Arabic AppErrors. */
 export const runMulter =
-  (handler: RequestHandler): RequestHandler =>
+  (handler: RequestHandler, fallbackMessage = 'تعذر رفع الملف'): RequestHandler =>
   (req, res, next) => {
     handler(req, res, (error: unknown) => {
       if (!error) {
@@ -59,6 +59,6 @@ export const runMulter =
       if (error instanceof multer.MulterError) {
         return next(AppError.badRequest(multerMessage(error), { field: error.field }));
       }
-      return next(AppError.badRequest('تعذر رفع الملف'));
+      return next(AppError.badRequest(fallbackMessage));
     });
   };

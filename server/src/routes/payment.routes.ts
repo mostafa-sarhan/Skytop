@@ -1,21 +1,14 @@
-import { RequestHandler, Router } from 'express';
+import { Router } from 'express';
 import { authorize } from '../middlewares/authorize';
 import { asyncHandler } from '../utils/asyncHandler';
 import { validateBody, validateParams, validateQuery } from '../middlewares/validate';
-import { uploadSingle } from '../middlewares/upload';
-import { AppError } from '../utils/AppError';
+import { runMulter, uploadSingle } from '../middlewares/upload';
 import * as paymentController from '../controllers/payment.controller';
 import { createPaymentSchema, paymentListQuery, uuidParam, voidPaymentSchema } from '../validators';
 
-const runUpload: RequestHandler = (req, res, next) => {
-  uploadSingle(req, res, (error: unknown) => {
-    if (error) {
-      next(error instanceof AppError ? error : AppError.badRequest('تعذر رفع صورة الإيصال'));
-      return;
-    }
-    next();
-  });
-};
+// Shared upload wrapper: same limits, Arabic error messages, and UTF-8 file
+// names (Arabic receipt names such as «إيصال تحويل.jpg» are kept intact).
+const runUpload = runMulter(uploadSingle, 'تعذر رفع صورة الإيصال');
 
 const router = Router();
 
