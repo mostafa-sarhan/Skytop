@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-next
+dist-prev
+scripts
+.env
+.env.*
+*.local
+*.log
+.git
+Dockerfile
+.dockerignore

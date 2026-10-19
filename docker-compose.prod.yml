@@ -1,0 +1,149 @@
+# Sky Top — production stack (PostgreSQL + API + web client).
+#
+# Always run through the wrapper, which adds the env file and project name:
+#   deploy/scripts/compose.sh up -d            # = docker compose -f docker-compose.prod.yml --env-file /etc/skytop/docker.env ...
+# Full guide: deploy/README.md. Settings: deploy/env/docker.env.example.
+#
+# Traffic: Internet → host Nginx (HTTPS) → 127.0.0.1:${FRONTEND_PORT} (frontend)
+#                                        → 127.0.0.1:${BACKEND_PORT}/api/ (backend) → postgres
+# Nothing is published on a public interface; PostgreSQL is not published at all.
+
+name: skytop
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-backend-env: &backend-env
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  PORT: "4000"
+  # The password is URL-embedded: generate it with `openssl rand -hex 24`.
+  DATABASE_URL: postgresql://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?set POSTGRES_DB}
+  UPLOAD_DIR: /var/lib/skytop/uploads
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [db]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    # Let PostgreSQL finish a clean shutdown (the default 10 s can cut it short).
+    stop_grace_period: 60s
+    shm_size: 256mb
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  # One-shot: `deploy/scripts/compose.sh run --rm migrate` (prisma migrate deploy).
+  # Not started by `up` (profile "ops").
+  migrate:
+    image: skytop-migrate:${SKYTOP_TAG:-current}
+    build:
+      context: ./server
+      target: migrate
+    profiles: ["ops"]
+    environment:
+      <<: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [db]
+    restart: "no"
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  backend:
+    image: skytop-backend:${SKYTOP_TAG:-current}
+    build:
+      context: ./server
+      target: runtime
+    restart: unless-stopped
+    init: true
+    environment:
+      <<: *backend-env
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN (https://YOUR_DOMAIN)}
+      # Host Nginx reaches the container through the published loopback port,
+      # i.e. from this network's gateway: trust X-Forwarded-For from it only.
+      TRUST_PROXY: loopback,${SKYTOP_GATEWAY:-172.30.80.1}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-8388608}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-1200}
+      LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-10}
+      LOGIN_FAILURES_PER_ACCOUNT: ${LOGIN_FAILURES_PER_ACCOUNT:-10}
+      SENSITIVE_RATE_LIMIT_MAX: ${SENSITIVE_RATE_LIMIT_MAX:-10}
+      UPLOAD_RATE_LIMIT_MAX: ${UPLOAD_RATE_LIMIT_MAX:-120}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      # Private files on the host (owned by uid 10001, mode 700), outside any
+      # web root; only this container mounts them.
+      - type: bind
+        source: ${UPLOADS_DIR:-/var/lib/skytop/uploads}
+        target: /var/lib/skytop/uploads
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      edge:
+        gw_priority: 1
+      db: {}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-4000}:4000"
+    # The API stops within 10 s (src/server.ts); give it a little more.
+    stop_grace_period: 20s
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  frontend:
+    image: skytop-frontend:${SKYTOP_TAG:-current}
+    build:
+      context: ./client
+    restart: unless-stopped
+    networks: [edge]
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:8080"
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+volumes:
+  pgdata:
+
+networks:
+  # PostgreSQL only: no published ports, no outside access.
+  db:
+    internal: true
+  # Published (loopback) ports. Fixed subnet so the gateway address used in
+  # TRUST_PROXY is known; change both SKYTOP_SUBNET and SKYTOP_GATEWAY if
+  # this range is taken on the host.
+  edge:
+    ipam:
+      config:
+        - subnet: ${SKYTOP_SUBNET:-172.30.80.0/24}
+          gateway: ${SKYTOP_GATEWAY:-172.30.80.1}

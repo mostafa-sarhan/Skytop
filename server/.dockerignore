@@ -1,0 +1,13 @@
+# Only what the image build needs: package files, prisma/, src/, tsconfig.json.
+node_modules
+dist
+uploads
+tests
+scripts
+.env
+.env.*
+*.log
+*.dump
+.git
+Dockerfile
+.dockerignore
