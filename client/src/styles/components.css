@@ -543,6 +543,13 @@ table.data a {
   padding-inline-end: 44px;
 }
 
+/* An LTR field (passwords, usernames) inside the RTL layout: the button sits
+   on the layout's inline end (left), which is the field's inline START. */
+[dir='rtl'] .input-affix .input[dir='ltr'] {
+  padding-inline-start: 44px;
+  padding-inline-end: 13px;
+}
+
 .input-affix .affix-btn {
   position: absolute;
   inset-inline-end: 5px;
