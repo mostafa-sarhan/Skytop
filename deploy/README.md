@@ -8,7 +8,7 @@ not mix the two on one server.)
 
 ```
 Internet ──HTTPS──▶ host Nginx :443 (TLS, HSTS, Let's Encrypt)
-                      ├── /       ─▶ 127.0.0.1:8080 ─▶ frontend  (nginx-unprivileged: Vite build, CSP, caching, SPA fallback)
+                      ├── /       ─▶ 127.0.0.1:8083 ─▶ frontend  (nginx-unprivileged: Vite build, CSP, caching, SPA fallback)
                       └── /api/   ─▶ 127.0.0.1:4000 ─▶ backend   (Node 22, compiled API, uid 10001)
                                                           │  network "db" (internal, no outside access)
                                                           ▼
@@ -153,7 +153,7 @@ dataset refuses to run in production (`NODE_ENV=production` inside the image).
 ```bash
 $C ps                                                  # postgres, backend, frontend: healthy
 /opt/skytop/app/deploy/scripts/healthcheck.sh          # healthy: {"status":"ok","database":"ok",…}
-curl -s http://127.0.0.1:8080/healthz                  # ok
+curl -s http://127.0.0.1:8083/healthz                  # ok
 ```
 
 Health checks: backend → `GET /api/v1/health` (API + database, 503 while the
@@ -310,7 +310,7 @@ before that release (section 8). If the image is gone,
 curl -sI https://YOUR_DOMAIN | grep -iE 'strict-transport|content-security|x-frame'
 curl -sI https://YOUR_DOMAIN/api/v1/health | grep -iE 'x-request-id|x-powered-by'   # request id yes, powered-by no
 curl -s -o /dev/null -w '%{http_code}\n' https://YOUR_DOMAIN/.env                   # 403
-ss -ltnp | grep -E ':(4000|8080|5432)\b'      # only 127.0.0.1:4000 / 127.0.0.1:8080, no 5432
+ss -ltnp | grep -E ':(4000|8083|5432)\b'      # only 127.0.0.1:4000 / 127.0.0.1:8083, no 5432
 $C ps                                          # all healthy
 $C logs --since 10m backend | tail
 ```

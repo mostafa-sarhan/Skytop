@@ -14,6 +14,8 @@
  *     alert / confirm / prompt), focus starts on «رجوع», Tab stays inside,
  *     Escape closes and focus returns. Never confirms — read-only.
  *   - phone: account status tabs fully visible; account card opens the account
+ *   - navbar: no drawer toggle beside the permanent desktop sidebar; on
+ *     tablet / phone the toggle opens and closes the sidebar
  *   - financial pages show Western digits only
  *
  * Usage:
@@ -263,6 +265,26 @@ try {
   const cardHref = await evaluate(`document.querySelector('.account-card').dataset.href`);
   await evaluate(`document.querySelector('.account-card .account-card-figures').click()`);
   check('phone: tapping an account card opens the account', await waitFor(`location.pathname === ${JSON.stringify(cardHref)}`, 8000), await evaluate('location.pathname'));
+
+  // ---------------- navbar drawer toggle follows the sidebar
+  const NAV = `(() => { const b = document.querySelector('.topbar .menu-btn'); const r = b.getBoundingClientRect(); const sb = document.querySelector('.sidebar'); const s = sb.getBoundingClientRect(); const vw = document.documentElement.clientWidth; return { toggle: getComputedStyle(b).display !== 'none' && r.width > 0, permanent: getComputedStyle(sb).position !== 'fixed' && s.left >= 0 && s.right <= vw, open: sb.classList.contains('open') && s.left >= 0 && s.right <= vw + 1 }; })()`;
+  for (const width of [1440, 1280, 1024, 768, 390]) {
+    await size(width, 900);
+    await send('Page.navigate', { url: `${APP}/pilgrims` });
+    await waitFor(`!!document.querySelector('.topbar .menu-btn') && !!document.querySelector('.page-header')`);
+    const nav = await evaluate(NAV);
+    if (width > 1024) {
+      check(`navbar (${width}): no drawer toggle next to a permanent sidebar`, !nav.toggle && nav.permanent, JSON.stringify(nav));
+    } else {
+      await evaluate(`document.querySelector('.topbar .menu-btn').click()`);
+      await sleep(450);
+      const opened = await evaluate(NAV);
+      await evaluate(`document.querySelector('.drawer-backdrop')?.click()`);
+      await sleep(450);
+      const closed = await evaluate(NAV);
+      check(`navbar (${width}): drawer toggle shown and opens / closes the sidebar`, nav.toggle && !nav.permanent && opened.open && !closed.open, JSON.stringify({ nav, opened: opened.open, closed: closed.open }));
+    }
+  }
 
   // ---------------- Western digits on financial pages
   await size(1280, 900);

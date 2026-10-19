@@ -280,7 +280,10 @@
   margin-inline-start: auto;
 }
 
-.menu-btn {
+/* Drawer toggle: only while the sidebar is off-canvas (max-width: 1024px,
+   below). Scoped to .topbar so it outranks .icon-btn's display, which is
+   declared later in components.css. */
+.topbar .menu-btn {
   display: none;
 }
 
@@ -699,7 +702,7 @@
     animation: fade-in var(--dur-fast) var(--ease);
   }
 
-  .menu-btn {
+  .topbar .menu-btn {
     display: inline-flex;
   }
 
