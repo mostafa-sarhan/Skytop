@@ -1,47 +1,71 @@
 #!/usr/bin/env bash
-# Build and (re)start Sky Top from the code currently checked out in APP_DIR.
+# Build and roll out the code currently checked out in the repository
+# (after `git pull --ff-only`):
 #
 #   sudo /opt/skytop/app/deploy/scripts/release.sh
 #
-# Steps: backup → server install/build → `prisma migrate deploy` (never
-# reset) → client build into a new folder, swapped in atomically → restart
-# the API → wait for /api/v1/health. Builds run as the skytop user.
+# Order: backup → build images tagged with the commit → postgres healthy →
+# `prisma migrate deploy` (one-shot container; never reset) → backend →
+# frontend → health check. The running containers keep serving until the new
+# images are built and migrated; if any step fails the old version stays up.
+# The new images are also tagged "current" (what compose runs by default);
+# older commit tags are kept for rollback.sh (the newest KEEP_IMAGES).
+#
+# Settings (environment): SKYTOP_ENV_FILE, SKYTOP_PROJECT (see compose.sh),
+#   SKIP_BACKUP=1   skip the pre-release backup (not recommended)
+#   KEEP_IMAGES     commit-tagged images kept per service (default 5)
+#   RELEASE_LOG     history of released tags (default /var/lib/skytop/releases.log)
 set -Eeuo pipefail
 
-APP_DIR="${APP_DIR:-/opt/skytop/app}"
-ENV_FILE="${SKYTOP_ENV_FILE:-/etc/skytop/server.env}"
-SERVICE="${SERVICE:-skytop-api}"
-RUN_AS="${RUN_AS:-skytop}"
-SKIP_BACKUP="${SKIP_BACKUP:-0}"
+SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(cd "$SCRIPTS/../.." && pwd)"
+ENV_FILE="${SKYTOP_ENV_FILE:-/etc/skytop/docker.env}"
+KEEP_IMAGES="${KEEP_IMAGES:-5}"
+RELEASE_LOG="${RELEASE_LOG:-/var/lib/skytop/releases.log}"
+export SKYTOP_ENV_FILE="$ENV_FILE"
 
 log() { printf '%s release: %s\n' "$(date -Iseconds)" "$*"; }
 fail() { log "FAILED: $*"; exit 1; }
-trap 'fail "line $LINENO: $BASH_COMMAND"' ERR
-as_app() { runuser -u "$RUN_AS" -- "$@"; }
+trap 'fail "line $LINENO: $BASH_COMMAND (the previous version is still running)"' ERR
+compose() { "$SCRIPTS/compose.sh" "$@"; }
 
 [[ -r "$ENV_FILE" ]] || fail "cannot read $ENV_FILE"
-cd "$APP_DIR"
-log "code: $(as_app git -C "$APP_DIR" log -1 --format='%h %s')"
+[[ -z "$(git -C "$APP_DIR" status --porcelain --untracked-files=no)" ]] || fail "uncommitted changes in $APP_DIR"
+TAG="$(git -C "$APP_DIR" rev-parse --short=12 HEAD)"
+log "code: $(git -C "$APP_DIR" log -1 --format='%h %s')"
 
-if [[ "$SKIP_BACKUP" != "1" ]]; then
+if [[ "${SKIP_BACKUP:-0}" != "1" && -n "$(compose ps --status running -q postgres)" ]]; then
   log "backup before release"
-  "$APP_DIR/deploy/scripts/backup.sh"
+  "$SCRIPTS/backup.sh"
 fi
 
-log "server: install + build"
-as_app bash -c "cd '$APP_DIR/server' && npm ci --no-audit --no-fund && npx prisma generate && npm run build"
+log "building images $TAG"
+SKYTOP_TAG="$TAG" compose build --pull backend frontend migrate
 
+log "database: waiting for postgres"
+compose up -d --wait postgres
 log "database: prisma migrate deploy"
-as_app bash -c "set -a && . '$ENV_FILE' && set +a && cd '$APP_DIR/server' && npx prisma migrate deploy"
+SKYTOP_TAG="$TAG" compose run --rm migrate
 
-log "client: install + build"
-as_app bash -c "cd '$APP_DIR/client' && npm ci --no-audit --no-fund && npx tsc -b && npx vite build --outDir dist-next --emptyOutDir"
-# Swap the new build in at once (Nginx serves client/dist).
-rm -rf "$APP_DIR/client/dist-prev"
-[[ -d "$APP_DIR/client/dist" ]] && mv "$APP_DIR/client/dist" "$APP_DIR/client/dist-prev"
-mv "$APP_DIR/client/dist-next" "$APP_DIR/client/dist"
+for image in skytop-backend skytop-frontend skytop-migrate; do
+  docker tag "$image:$TAG" "$image:current"
+done
 
-log "restarting $SERVICE"
-systemctl restart "$SERVICE"
-"$APP_DIR/deploy/scripts/healthcheck.sh" "http://127.0.0.1:$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2 || echo 4000)"
-log "release complete"
+log "starting backend"
+compose up -d --wait --no-deps backend
+log "starting frontend"
+compose up -d --wait --no-deps frontend
+
+BACKEND_PORT="$(grep -E '^BACKEND_PORT=' "$ENV_FILE" | tail -n1 | cut -d= -f2- || true)"
+"$SCRIPTS/healthcheck.sh" "http://127.0.0.1:${BACKEND_PORT:-4000}"
+
+mkdir -p "$(dirname "$RELEASE_LOG")"
+printf '%s %s\n' "$(date -Iseconds)" "$TAG" >> "$RELEASE_LOG"
+
+# Keep the newest KEEP_IMAGES commit tags per image (plus "current").
+for image in skytop-backend skytop-frontend skytop-migrate; do
+  docker image ls "$image" --format '{{.Tag}}' | { grep -vx -e current -e "$TAG" || true; } | tail -n +"$KEEP_IMAGES" \
+    | while read -r old; do docker image rm "$image:$old" > /dev/null && log "removed old image $image:$old"; done
+done
+docker image prune -f > /dev/null
+log "release $TAG complete"

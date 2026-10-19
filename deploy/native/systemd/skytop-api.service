@@ -1,11 +1,11 @@
 # /etc/systemd/system/skytop-api.service — Sky Top API (Node.js, compiled build).
-# Install: sudo cp deploy/systemd/skytop-api.service /etc/systemd/system/
+# Install: sudo cp deploy/native/systemd/skytop-api.service /etc/systemd/system/
 #          sudo systemctl daemon-reload && sudo systemctl enable --now skytop-api
 # Logs:    journalctl -u skytop-api -f        (JSON lines, one per request)
 
 [Unit]
 Description=Sky Top API
-Documentation=file:///opt/skytop/app/deploy/README.md
+Documentation=file:///opt/skytop/app/deploy/native/README.md
 After=network-online.target postgresql.service
 Wants=network-online.target
 

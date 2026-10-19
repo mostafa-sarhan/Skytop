@@ -1,5 +1,6 @@
 # /etc/cron.d/skytop-backup — nightly Sky Top backup at 02:30 (server time).
-# Keeps 7 daily and 4 weekly (Sunday) backups in /var/backups/skytop.
+# Dumps the database from the postgres container and archives the uploads
+# folder; keeps 7 daily and 4 weekly (Sunday) backups in /var/backups/skytop.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 30 2 * * * root /opt/skytop/app/deploy/scripts/backup.sh >> /var/log/skytop-backup.log 2>&1

@@ -2,8 +2,10 @@
 
 ## Production
 
-Deployment (Hostinger VPS: Nginx + HTTPS, systemd, PostgreSQL, private
-uploads, backups / restore): see [`deploy/README.md`](deploy/README.md).
+Deployment on a Hostinger VPS with Docker Compose (PostgreSQL, API and web
+client containers behind host Nginx + Let's Encrypt; private uploads, backups /
+restore, releases and rollback): see [`deploy/README.md`](deploy/README.md).
+A non-Docker fallback (systemd) is in [`deploy/native/README.md`](deploy/native/README.md).
 
 ## Checks and tests
 
@@ -13,6 +15,8 @@ cd server && npm run test:api            # API integration tests on a dedicated 
 cd client && npm run lint && npm run build && npm run check:dialogs
 # Browser checks against a running stack (APP_URL, API_URL, CHECK_USER, CHECK_PASSWORD):
 cd client && npm run check:ui && ROUTES=all npm run check:rtl
+# Production images / compose file:
+docker compose -f docker-compose.prod.yml --env-file deploy/env/docker.env.example config --quiet
 ```
 
 ## Demo data (development only)

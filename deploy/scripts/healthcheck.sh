@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Waits for the API to report ready (database reachable) and prints the result.
 #
-#   deploy/scripts/healthcheck.sh                       # http://127.0.0.1:4000
+#   deploy/scripts/healthcheck.sh                       # http://127.0.0.1:4000 (backend port)
 #   deploy/scripts/healthcheck.sh https://YOUR_DOMAIN   # through Nginx + HTTPS
 set -Euo pipefail
 BASE="${1:-http://127.0.0.1:4000}"
