@@ -126,6 +126,14 @@ export const LoginPage = () => {
           </form>
 
           <div className="foot-note">للدعم الفني تواصل مع مسؤول النظام</div>
+          {/* English credit: an LTR block so the phrase keeps its word order inside the RTL page. */}
+          <p className="dev-credit" dir="ltr" lang="en">
+            Developed by{' '}
+            <a href="https://mostafasarhan.tech" target="_blank" rel="noopener noreferrer">
+              Mostafa Sarhan
+              <span className="sr-only" lang="ar"> (يفتح في نافذة جديدة)</span>
+            </a>
+          </p>
         </div>
       </div>
     </div>
