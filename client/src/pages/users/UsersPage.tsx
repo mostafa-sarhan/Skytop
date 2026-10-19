@@ -18,6 +18,7 @@ import {
 } from '../../ui/primitives';
 import { useAuth } from '../../auth/AuthContext';
 import { useToast } from '../../ui/Toast';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 
 const UserModal = ({
   user,
@@ -64,6 +65,7 @@ const UserModal = ({
     <Modal
       title={user ? `تعديل الحساب — ${user.username}` : 'إضافة مستخدم جديد'}
       onClose={onClose}
+      dismissible={!submitting}
       footer={
         <>
           <button type="button" className="btn secondary" onClick={onClose}>
@@ -155,6 +157,7 @@ const ResetPasswordModal = ({ user, onClose }: { user: User; onClose: () => void
     <Modal
       title={`إعادة تعيين كلمة مرور — ${user.username}`}
       onClose={onClose}
+      dismissible={!submitting}
       size="narrow"
       footer={
         <>
@@ -209,15 +212,7 @@ export const UsersPage = () => {
     [list.page, list.pageSize, list.debouncedSearch, debouncedRole],
   );
 
-  const toggleActive = async (user: User) => {
-    try {
-      await api.patch(`/users/${user.id}`, { isActive: !user.isActive });
-      toast.success(user.isActive ? 'تم إيقاف الحساب' : 'تم تفعيل الحساب');
-      reload();
-    } catch (err) {
-      toast.error(errorMessage(err));
-    }
-  };
+  const [statusUser, setStatusUser] = useState<User | null>(null);
 
   return (
     <div className="page">
@@ -306,7 +301,7 @@ export const UsersPage = () => {
                           <button
                             type="button"
                             className="btn ghost sm"
-                            onClick={() => void toggleActive(user)}
+                            onClick={() => setStatusUser(user)}
                           >
                             {user.isActive ? 'إيقاف' : 'تفعيل'}
                           </button>
@@ -326,6 +321,31 @@ export const UsersPage = () => {
         <UserModal user={modalUser} onClose={() => setModalUser(undefined)} onSaved={reload} />
       ) : null}
       {resetUser ? <ResetPasswordModal user={resetUser} onClose={() => setResetUser(null)} /> : null}
+      {statusUser ? (
+        <ConfirmDialog
+          title={statusUser.isActive ? 'إيقاف الحساب' : 'تفعيل الحساب'}
+          confirmLabel={statusUser.isActive ? 'إيقاف الحساب' : 'تفعيل الحساب'}
+          tone={statusUser.isActive ? 'danger' : 'primary'}
+          onClose={() => setStatusUser(null)}
+          onConfirm={async () => {
+            await api.patch(`/users/${statusUser.id}`, { isActive: !statusUser.isActive });
+            toast.success(statusUser.isActive ? 'تم إيقاف الحساب' : 'تم تفعيل الحساب');
+            reload();
+          }}
+        >
+          {statusUser.isActive ? (
+            <p>
+              سيتم إيقاف حساب <strong>«{statusUser.fullName}»</strong> (<span className="mono-inline">{statusUser.username}</span>).
+              لن يتمكن من تسجيل الدخول، وتنتهي جلساته المفتوحة فوراً. يمكن إعادة تفعيله لاحقاً.
+            </p>
+          ) : (
+            <p>
+              سيتم تفعيل حساب <strong>«{statusUser.fullName}»</strong> (<span className="mono-inline">{statusUser.username}</span>)
+              ليتمكن من تسجيل الدخول من جديد.
+            </p>
+          )}
+        </ConfirmDialog>
+      ) : null}
     </div>
   );
 };

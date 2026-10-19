@@ -15,6 +15,7 @@ import {
   TextInput,
 } from '../../ui/primitives';
 import { AccountStatusBadge, Money } from '../../components/DelegateAccount';
+import { useRowLink } from '../../lib/rowLink';
 
 const TABS: Array<{ id: '' | AccountStatus; label: string }> = [
   { id: '', label: 'الكل' },
@@ -29,6 +30,7 @@ const TABS: Array<{ id: '' | AccountStatus; label: string }> = [
  */
 export const AccountsPage = () => {
   const list = useListState();
+  const rowLink = useRowLink();
   const [accountStatus, setAccountStatus] = useState<'' | AccountStatus>('');
 
   const { data, loading, error } = useAsync<DelegateAccountList>(
@@ -112,7 +114,7 @@ export const AccountsPage = () => {
                   </thead>
                   <tbody>
                     {data.items.map((row) => (
-                      <tr key={row.id}>
+                      <tr key={row.id} {...rowLink(`/accounts/${row.id}`)}>
                         <td>
                           <Link to={`/accounts/${row.id}`}>
                             <strong>{row.name}</strong>
@@ -176,8 +178,9 @@ const mainBalance = (account: DelegateAccountList['items'][number]['account']) =
 
 const AccountCard = ({ row }: { row: DelegateAccountList['items'][number] }) => {
   const balance = mainBalance(row.account);
+  const rowLink = useRowLink();
   return (
-    <li className="account-card">
+    <li {...rowLink(`/accounts/${row.id}`, undefined, 'account-card')}>
       <div className="account-card-head">
         <div className="account-card-id">
           <Link to={`/accounts/${row.id}`} className="account-card-name">

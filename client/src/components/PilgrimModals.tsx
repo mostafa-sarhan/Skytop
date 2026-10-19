@@ -64,6 +64,7 @@ export const TransferModal = ({
     <Modal
       title={`نقل المعتمر — ${pilgrim.name}`}
       onClose={onClose}
+      dismissible={!submitting}
       footer={
         <>
           <button type="button" className="btn secondary" onClick={onClose}>
@@ -151,6 +152,7 @@ export const CancelPilgrimModal = ({
     <Modal
       title="استبعاد معتمر"
       onClose={onClose}
+      dismissible={!submitting}
       size="narrow"
       footer={
         <>

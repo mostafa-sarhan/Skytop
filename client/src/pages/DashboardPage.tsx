@@ -17,6 +17,7 @@ import {
 } from '../lib/format';
 import { Badge, EmptyState, Icon, LoadingBlock, PageHeader, StatCard } from '../ui/primitives';
 import type { IconName } from '../ui/primitives';
+import { useRowLink } from '../lib/rowLink';
 
 const greeting = (date: Date): string => (date.getHours() < 12 ? 'صباح الخير' : 'مساء الخير');
 
@@ -48,6 +49,7 @@ const files = (n: number) => `${formatCount(n)} ملف ناقص`;
 
 export const DashboardPage = () => {
   const { isManager } = useAuth();
+  const rowLink = useRowLink();
   const [now] = useState(() => new Date());
   const { data, loading, error, reload } = useAsync<DashboardStats>(
     (signal) => api.get<DashboardStats>('/dashboard/stats', undefined, signal),
@@ -250,7 +252,7 @@ export const DashboardPage = () => {
                 </thead>
                 <tbody>
                   {upcomingTrips.map((trip) => (
-                    <tr key={trip.id}>
+                    <tr key={trip.id} {...rowLink(`/trips/${trip.id}`)}>
                       <td className="primary-cell">
                         <Link to={`/trips/${trip.id}`}>
                           <strong>{trip.name}</strong>
@@ -301,7 +303,7 @@ export const DashboardPage = () => {
             ) : (
               <ul className="dash-list">
                 {documents.topTrips.map((row) => (
-                  <li key={row.tripId}>
+                  <li key={row.tripId} {...rowLink(`/trips/${row.tripId}`)}>
                     <div className="dash-list-main">
                       <Link to={`/trips/${row.tripId}`}>
                         <strong>{row.tripName}</strong>

@@ -4,6 +4,7 @@ import type { DocumentType, PilgrimDocument } from '../api/types';
 import { formatDateTime, formatFileSize } from '../lib/format';
 import { Badge, Icon } from '../ui/primitives';
 import { useToast } from '../ui/Toast';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { ACCEPTED_DOCUMENT_TYPES, documentFileError, documentLabel } from '../lib/documents';
 
 /**
@@ -73,19 +74,12 @@ export const PilgrimDocumentCard = ({
     }
   };
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const remove = async () => {
-    if (!window.confirm(`حذف ${label}؟`)) return;
-    setBusy(true);
     setError('');
-    try {
-      await api.delete(`/pilgrims/${pilgrimId}/documents/${type}`);
-      toast.success(`تم حذف ${label}`);
-      onChanged();
-    } catch (err) {
-      setError(errorMessage(err, 'تعذر حذف الملف'));
-    } finally {
-      setBusy(false);
-    }
+    await api.delete(`/pilgrims/${pilgrimId}/documents/${type}`);
+    toast.success(`تم حذف ${label}`);
+    onChanged();
   };
 
   return (
@@ -160,7 +154,7 @@ export const PilgrimDocumentCard = ({
                 </button>
               ) : null}
               {canEdit && !isPassport ? (
-                <button type="button" className="btn ghost sm" onClick={() => void remove()} disabled={busy}>
+                <button type="button" className="btn ghost sm" onClick={() => setConfirmingDelete(true)} disabled={busy}>
                   <Icon name="trash" size={14} /> حذف
                 </button>
               ) : null}
@@ -191,6 +185,16 @@ export const PilgrimDocumentCard = ({
 
         {!canEdit && readOnlyReason ? <div className="muted small">{readOnlyReason}</div> : null}
         {error ? <div className="alert error">{error}</div> : null}
+        {confirmingDelete ? (
+          <ConfirmDialog
+            title={`حذف ${label}`}
+            confirmLabel="حذف الملف"
+            onClose={() => setConfirmingDelete(false)}
+            onConfirm={remove}
+          >
+            <p>سيتم حذف {label} من ملف المعتمر. يمكن رفع ملف جديد بعد ذلك.</p>
+          </ConfirmDialog>
+        ) : null}
         <input
           ref={inputRef}
           type="file"

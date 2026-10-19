@@ -18,6 +18,7 @@ import {
   useDebouncedValue,
 } from '../../ui/primitives';
 import type { PilgrimListOrigin } from './PilgrimDetailPage';
+import { useRowLink } from '../../lib/rowLink';
 
 const PAGE_SIZE = 20;
 const FILTER_KEYS = ['q', 'tripId', 'delegateId', 'documentStatus'] as const;
@@ -114,6 +115,7 @@ export const PilgrimsPage = () => {
 
   const filtered = FILTER_KEYS.some((key) => params.get(key));
   const origin: PilgrimListOrigin = { from: `${location.pathname}${location.search}` };
+  const rowLink = useRowLink();
 
   return (
     <div className="page">
@@ -233,7 +235,7 @@ export const PilgrimsPage = () => {
               {cards ? (
                 <ul className={`pilgrim-cards${loading ? ' is-refreshing' : ''}`}>
                   {data.items.map((pilgrim) => (
-                    <li key={pilgrim.id} className={`pilgrim-card${pilgrim.status === 'CANCELLED' ? ' is-cancelled' : ''}`}>
+                    <li key={pilgrim.id} {...rowLink(`/pilgrims/${pilgrim.id}`, origin, `pilgrim-card${pilgrim.status === 'CANCELLED' ? ' is-cancelled' : ''}`)}>
                       <div className="pilgrim-card-head">
                         <Link to={`/pilgrims/${pilgrim.id}`} state={origin}>
                           <strong>{pilgrim.name}</strong>
@@ -277,7 +279,7 @@ export const PilgrimsPage = () => {
                     </thead>
                     <tbody>
                       {data.items.map((pilgrim) => (
-                        <tr key={pilgrim.id} className={pilgrim.status === 'CANCELLED' ? 'row-voided' : undefined}>
+                        <tr key={pilgrim.id} {...rowLink(`/pilgrims/${pilgrim.id}`, origin, pilgrim.status === 'CANCELLED' ? 'row-voided' : '')}>
                           <td className="name-cell">
                             <Link to={`/pilgrims/${pilgrim.id}`} state={origin}>
                               <strong>{pilgrim.name}</strong>

@@ -67,6 +67,7 @@ export const ChangePasswordModal = ({ onClose }: { onClose: () => void }) => {
     <Modal
       title="تغيير كلمة المرور"
       onClose={onClose}
+      dismissible={!submitting}
       footer={
         <>
           <button type="button" className="btn secondary" onClick={onClose}>

@@ -25,6 +25,7 @@ import {
 } from '../../ui/primitives';
 import { CancelPilgrimModal, TransferModal } from '../../components/PilgrimModals';
 import { PassengerListExport } from '../../components/PassengerListExport';
+import { useRowLink } from '../../lib/rowLink';
 
 /**
  * Main operational workspace: the pilgrims of ONE delegate in ONE trip.
@@ -34,6 +35,7 @@ import { PassengerListExport } from '../../components/PassengerListExport';
 export const DelegateTripPilgrimsPage = () => {
   const { delegateId = '', tripId = '' } = useParams();
   const navigate = useNavigate();
+  const rowLink = useRowLink();
   // Tablets and phones: cards (every action reachable without sideways scrolling).
   const cards = useMediaQuery(CARDS_QUERY);
   const [view, setView] = useState<PilgrimStatus>('ACTIVE');
@@ -258,7 +260,7 @@ export const DelegateTripPilgrimsPage = () => {
         ) : !loading && cards ? (
           <ul className="pilgrim-cards">
             {rows.map((pilgrim, index) => (
-              <li key={pilgrim.id} className={`pilgrim-card${pilgrim.status === 'CANCELLED' ? ' is-cancelled' : ''}`}>
+              <li key={pilgrim.id} {...rowLink(`${base}/${pilgrim.id}`, undefined, `pilgrim-card${pilgrim.status === 'CANCELLED' ? ' is-cancelled' : ''}`)}>
                 <div className="pilgrim-card-head">
                   <Link to={`${base}/${pilgrim.id}`}>
                     <span className="muted mono">{index + 1}.</span> <strong>{pilgrim.name}</strong>
@@ -310,7 +312,7 @@ export const DelegateTripPilgrimsPage = () => {
               </thead>
               <tbody>
                 {rows.map((pilgrim, index) => (
-                  <tr key={pilgrim.id}>
+                  <tr key={pilgrim.id} {...rowLink(`${base}/${pilgrim.id}`)}>
                     <td className="num mono">{index + 1}</td>
                     <td>
                       <Link to={`${base}/${pilgrim.id}`}>
@@ -348,7 +350,7 @@ export const DelegateTripPilgrimsPage = () => {
               </thead>
               <tbody>
                 {rows.map((pilgrim, index) => (
-                  <tr key={pilgrim.id}>
+                  <tr key={pilgrim.id} {...rowLink(`${base}/${pilgrim.id}`)}>
                     <td className="num mono">{index + 1}</td>
                     <td className="name-cell">
                       <Link to={`${base}/${pilgrim.id}`}>

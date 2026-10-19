@@ -39,6 +39,7 @@ export const VoidPaymentModal = ({
     <Modal
       title={`إلغاء دفعة إيصال رقم ${receiptNumberOf(payment)}`}
       onClose={onClose}
+      dismissible={!submitting}
       size="narrow"
       footer={
         <>

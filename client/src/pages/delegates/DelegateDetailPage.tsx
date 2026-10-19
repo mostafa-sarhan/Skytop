@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { api, errorMessage } from '../../api/client';
+import { api } from '../../api/client';
 import type { DelegateDetail, DelegateTripRow } from '../../api/types';
 import { useAsync } from '../../lib/hooks';
 import {
@@ -10,8 +10,9 @@ import {
   tripStatusLabel,
 } from '../../lib/format';
 import { Badge, Breadcrumbs, EmptyState, Icon, LoadingBlock, PageHeader } from '../../ui/primitives';
-import { useToast } from '../../ui/Toast';
 import { DelegateFormModal } from './DelegatesPage';
+import { DelegateStatusDialog } from '../../components/DelegateStatusDialog';
+import { useRowLink } from '../../lib/rowLink';
 
 /**
  * Operational delegate profile: basic data + the delegate's trips. Financial
@@ -20,7 +21,6 @@ import { DelegateFormModal } from './DelegatesPage';
 export const DelegateDetailPage = () => {
   const { delegateId = '' } = useParams();
   const navigate = useNavigate();
-  const toast = useToast();
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState(params.get('edit') === '1');
   const [showFinished, setShowFinished] = useState(false);
@@ -46,18 +46,8 @@ export const DelegateDetailPage = () => {
     detail.reload();
   };
 
-  const setStatus = async () => {
-    const delegate = detail.data;
-    if (!delegate) return;
-    const next = delegate.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    try {
-      await api.post(`/delegates/${delegateId}/status`, { status: next });
-      toast.success('تم تحديث حالة المندوب');
-      detail.reload();
-    } catch (error) {
-      toast.error(errorMessage(error));
-    }
-  };
+  const [statusOpen, setStatusOpen] = useState(false);
+  const rowLink = useRowLink();
 
   if (detail.loading)
     return (
@@ -88,7 +78,7 @@ export const DelegateDetailPage = () => {
                 <button type="button" className="btn" onClick={() => setEditing(true)}>
                   <Icon name="edit" size={15} /> تعديل
                 </button>
-                <button type="button" className="btn secondary" onClick={() => void setStatus()}>
+                <button type="button" className="btn secondary" onClick={() => setStatusOpen(true)}>
                   {delegate.status === 'ACTIVE' ? 'إيقاف المندوب' : 'تفعيل المندوب'}
                 </button>
               </>
@@ -165,7 +155,7 @@ export const DelegateDetailPage = () => {
                   </thead>
                   <tbody>
                     {trips.data.map((trip) => (
-                      <tr key={trip.tripId}>
+                      <tr key={trip.tripId} {...rowLink(workspace(trip.tripId))}>
                         <td className="primary-cell">
                           <Link to={workspace(trip.tripId)}>
                             <strong>{trip.name}</strong>
@@ -174,7 +164,7 @@ export const DelegateDetailPage = () => {
                         <td className="mono">{formatDate(trip.departureDate)}</td>
                         <td className="mono">{formatDate(trip.returnDate)}</td>
                         <td>{flightTypeLabel[trip.flightType]}</td>
-                        <td className="num mono">
+                        <td className="num">
                           <strong>{trip.activePilgrimCount}</strong> معتمر
                         </td>
                         <td>
@@ -197,6 +187,9 @@ export const DelegateDetailPage = () => {
         </div>
       </div>
 
+      {statusOpen ? (
+        <DelegateStatusDialog delegate={delegate} onClose={() => setStatusOpen(false)} onDone={detail.reload} />
+      ) : null}
       {editing ? (
         <DelegateFormModal delegate={delegate} onClose={closeEdit} onSaved={closeEdit} />
       ) : null}

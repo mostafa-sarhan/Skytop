@@ -24,6 +24,7 @@ import {
   useDebouncedValue,
 } from '../../ui/primitives';
 import { useToast } from '../../ui/Toast';
+import { useRowLink } from '../../lib/rowLink';
 
 /** Create / edit the trip's basic data. Status is changed from the trip page. */
 export const TripFormModal = ({
@@ -87,6 +88,7 @@ export const TripFormModal = ({
     <Modal
       title={trip ? 'تعديل بيانات الرحلة' : 'إضافة رحلة جديدة'}
       onClose={onClose}
+      dismissible={!submitting}
       footer={
         <>
           <button type="button" className="btn secondary" onClick={onClose}>
@@ -144,6 +146,7 @@ export const TripFormModal = ({
 export const TripsPage = () => {
   const list = useListState();
   const navigate = useNavigate();
+  const rowLink = useRowLink();
   const [status, setStatus] = useState<'' | TripStatus>('');
   // `?new=1` (dashboard quick action) opens the create form directly.
   const [params, setParams] = useSearchParams();
@@ -243,7 +246,7 @@ export const TripsPage = () => {
                   </thead>
                   <tbody>
                     {data.items.map((trip) => (
-                      <tr key={trip.id} style={trip.phase === 'FINISHED' ? { opacity: 0.75 } : undefined}>
+                      <tr key={trip.id} {...rowLink(`/trips/${trip.id}`)} style={trip.phase === 'FINISHED' ? { opacity: 0.75 } : undefined}>
                         <td className="primary-cell">
                           <Link to={`/trips/${trip.id}`}>
                             <strong>{trip.name}</strong>

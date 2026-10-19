@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "check:rtl": "node scripts/check-rtl-overflow.mjs",
     "check:ui": "node scripts/check-ui-smoke.mjs",
+    "check:dialogs": "node scripts/check-no-native-dialogs.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

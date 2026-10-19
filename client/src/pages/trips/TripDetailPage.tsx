@@ -28,6 +28,7 @@ import {
 import { useToast } from '../../ui/Toast';
 import { useAuth } from '../../auth/AuthContext';
 import { TripFormModal } from './TripsPage';
+import { useRowLink } from '../../lib/rowLink';
 
 /** Changes the trip status, explaining what each status allows. */
 const TripStatusModal = ({
@@ -63,6 +64,7 @@ const TripStatusModal = ({
     <Modal
       title={`حالة الرحلة — ${trip.name}`}
       onClose={onClose}
+      dismissible={!submitting}
       size="narrow"
       footer={
         <>
@@ -110,6 +112,7 @@ const TripStatusModal = ({
 export const TripDetailPage = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const rowLink = useRowLink();
   const [editing, setEditing] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -240,7 +243,7 @@ export const TripDetailPage = () => {
                 </thead>
                 <tbody>
                   {data.delegates.map((row) => (
-                    <tr key={row.id}>
+                    <tr key={row.id} {...rowLink(workspace(row.delegate.id))}>
                       <td className="primary-cell">
                         <Link to={workspace(row.delegate.id)}>
                           <strong>{row.delegate.name}</strong>
@@ -382,6 +385,7 @@ const AssignDelegateModal = ({
     <Modal
       title="إضافة مندوب للرحلة"
       onClose={onClose}
+      dismissible={!submitting}
       footer={
         <>
           <button type="button" className="btn secondary" onClick={onClose}>
@@ -487,6 +491,7 @@ const PriceModal = ({
     <Modal
       title={`تعديل سعر الفرد — ${assignment.name}`}
       onClose={onClose}
+      dismissible={!submitting}
       size="narrow"
       footer={
         <>

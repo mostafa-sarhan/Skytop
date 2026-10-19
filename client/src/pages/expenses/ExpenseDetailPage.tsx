@@ -44,6 +44,7 @@ const VoidExpenseModal = ({ expense, onClose, onDone }: { expense: Expense; onCl
     <Modal
       title="إلغاء مصروف"
       onClose={onClose}
+      dismissible={!submitting}
       size="narrow"
       footer={
         <>

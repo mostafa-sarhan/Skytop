@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, errorMessage } from '../../api/client';
 import type { Delegate, DelegateStatus, Paginated } from '../../api/types';
 import { useAsync, useListState, validationMessages } from '../../lib/hooks';
@@ -18,6 +18,8 @@ import {
 } from '../../ui/primitives';
 import { useDebouncedValue } from '../../ui/primitives';
 import { useToast } from '../../ui/Toast';
+import { useRowLink } from '../../lib/rowLink';
+import { DelegateStatusDialog } from '../../components/DelegateStatusDialog';
 
 const emptyForm = { name: '', phone: '', address: '', notes: '' };
 
@@ -80,6 +82,7 @@ export const DelegateFormModal = ({
     <Modal
       title={delegate ? 'تعديل المندوب' : 'إضافة مندوب جديد'}
       onClose={onClose}
+      dismissible={!submitting}
       footer={
         <>
           <button type="button" className="btn secondary" onClick={onClose}>
@@ -115,8 +118,6 @@ export const DelegateFormModal = ({
 
 export const DelegatesPage = () => {
   const list = useListState();
-  const toast = useToast();
-  const navigate = useNavigate();
   const [status, setStatus] = useState<'' | DelegateStatus>('');
   // `?new=1` (dashboard quick action) opens the create form directly.
   const [params, setParams] = useSearchParams();
@@ -142,18 +143,8 @@ export const DelegatesPage = () => {
     [list.page, list.pageSize, list.debouncedSearch, debouncedStatus],
   );
 
-  const toggleStatus = async (delegate: Delegate) => {
-    const next: DelegateStatus = delegate.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    const label = next === 'ACTIVE' ? 'تفعيل' : 'إيقاف';
-    if (!window.confirm(`${label} المندوب "${delegate.name}"؟`)) return;
-    try {
-      await api.post(`/delegates/${delegate.id}/status`, { status: next });
-      toast.success(`تم ${label} المندوب`);
-      reload();
-    } catch (err) {
-      toast.error(errorMessage(err));
-    }
-  };
+  const [statusTarget, setStatusTarget] = useState<Delegate | null>(null);
+  const rowLink = useRowLink();
 
   return (
     <div className="page">
@@ -226,7 +217,7 @@ export const DelegatesPage = () => {
                   <tbody>
                     {data.items.map((delegate) => {
                       return (
-                        <tr key={delegate.id}>
+                        <tr key={delegate.id} {...rowLink(`/delegates/${delegate.id}`)}>
                           <td className="primary-cell">
                             <Link to={`/delegates/${delegate.id}`}>
                               <strong>{delegate.name}</strong>
@@ -248,13 +239,6 @@ export const DelegatesPage = () => {
                           </td>
                           <td>
                             <div className="row">
-                              <button
-                                type="button"
-                                className="btn ghost sm"
-                                onClick={() => navigate(`/delegates/${delegate.id}`)}
-                              >
-                                <Icon name="eye" size={14} /> عرض
-                              </button>
                               {!delegate.isSystem ? (
                                 <>
                                   <Link className="btn ghost sm" to={`/delegates/${delegate.id}?edit=1`}>
@@ -263,7 +247,7 @@ export const DelegatesPage = () => {
                                   <button
                                     type="button"
                                     className="btn ghost sm"
-                                    onClick={() => void toggleStatus(delegate)}
+                                    onClick={() => setStatusTarget(delegate)}
                                   >
                                     {delegate.status === 'ACTIVE' ? 'إيقاف' : 'تفعيل'}
                                   </button>
@@ -285,6 +269,9 @@ export const DelegatesPage = () => {
 
       {modalOpen ? (
         <DelegateFormModal onClose={() => setModalOpen(false)} onSaved={reload} />
+      ) : null}
+      {statusTarget ? (
+        <DelegateStatusDialog delegate={statusTarget} onClose={() => setStatusTarget(null)} onDone={reload} />
       ) : null}
     </div>
   );

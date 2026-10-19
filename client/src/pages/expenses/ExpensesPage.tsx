@@ -26,6 +26,7 @@ import {
   TextInput,
   useDebouncedValue,
 } from '../../ui/primitives';
+import { useRowLink } from '../../lib/rowLink';
 
 const PAGE_SIZE = 20;
 const CATEGORIES = Object.keys(expenseCategoryLabel) as ExpenseCategory[];
@@ -39,6 +40,7 @@ const money = (value: string) => `${formatAmount(value)} جنيه`;
  */
 export const ExpensesPage = () => {
   const { isManager } = useAuth();
+  const rowLink = useRowLink();
   const [params, setParams] = useSearchParams();
   const get = (key: string) => params.get(key) ?? '';
   const page = Number(params.get('page') ?? '1') || 1;
@@ -261,7 +263,7 @@ export const ExpensesPage = () => {
                     {list.data.items.map((e) => {
                       const voided = e.status === 'VOIDED';
                       return (
-                        <tr key={e.id} className={voided ? 'row-voided' : undefined}>
+                        <tr key={e.id} {...rowLink(`/expenses/${e.id}`, undefined, voided ? 'row-voided' : '')}>
                           <td className="mono">{formatDate(e.expenseDate)}</td>
                           <td>{expenseCategoryLabel[e.category]}</td>
                           <td className="wrap primary-cell">

@@ -313,53 +313,105 @@ export const TextArea = ({
   />
 );
 
+/** Open dialogs, innermost last: only the top one reacts to Escape / Tab. */
+const openDialogs: symbol[] = [];
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Shared dialog: focus moves into it (to `[data-autofocus]` when present),
+ * Tab stays inside it, Escape / backdrop close it unless `dismissible` is
+ * false (e.g. while saving), and focus returns to where it was on close.
+ */
 export const Modal = ({
   title,
   children,
   footer,
   onClose,
   size = 'default',
+  dismissible = true,
 }: {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
   size?: 'default' | 'wide' | 'narrow';
+  dismissible?: boolean;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  // Latest handlers without re-running the mount effect (which moves focus).
+  const latest = useRef({ onClose, dismissible });
+  useEffect(() => {
+    latest.current = { onClose, dismissible };
+  });
 
   useEffect(() => {
+    const id = Symbol('dialog');
+    openDialogs.push(id);
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const node = ref.current;
+    (node?.querySelector<HTMLElement>('[data-autofocus]') ?? node)?.focus();
+
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (openDialogs[openDialogs.length - 1] !== id || !node) return;
+      if (event.key === 'Escape') {
+        if (latest.current.dismissible) latest.current.onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      // Focus trap (only while focus is in the dialog; the shared select's
+      // menu lives in a portal and manages its own keys).
+      const active = document.activeElement;
+      if (active !== node && !node.contains(active)) return;
+      const items = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+        (el) => el.offsetParent !== null || el === active,
+      );
+      if (items.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = items[0]!;
+      const last = items[items.length - 1]!;
+      if (event.shiftKey && (active === first || active === node)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
-    ref.current?.focus();
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      openDialogs.splice(openDialogs.indexOf(id), 1);
+      if (openDialogs.length === 0) document.body.style.overflow = '';
+      if (previous && previous.isConnected) previous.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div
       className="modal-backdrop"
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget && latest.current.dismissible) onClose();
       }}
     >
       <div
         className={`modal${size === 'wide' ? ' wide' : size === 'narrow' ? ' narrow' : ''}`}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
         tabIndex={-1}
         ref={ref}
       >
         <div className="modal-header">
-          <h3>{title}</h3>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="إغلاق">
+          <h3 id={titleId}>{title}</h3>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="إغلاق" disabled={!dismissible}>
             <Icon name="close" size={18} />
           </button>
         </div>

@@ -7,6 +7,14 @@
  *     long lists are searchable (Arabic), opens upward near the bottom,
  *     stays above modals and Escape closes only the menu
  *   - phone: pilgrim-card actions are inside the screen with usable targets
+ *   - clickable rows / cards: clicking empty space (or Enter on the focused
+ *     row) opens the detail page; actions inside a row do not navigate;
+ *     list context survives (pilgrim → «رجوع» returns to the filtered list)
+ *   - dialogs: sensitive actions use the shared ConfirmDialog (no native
+ *     alert / confirm / prompt), focus starts on «رجوع», Tab stays inside,
+ *     Escape closes and focus returns. Never confirms — read-only.
+ *   - phone: account status tabs fully visible; account card opens the account
+ *   - financial pages show Western digits only
  *
  * Usage:
  *   APP_URL=http://localhost:5173 API_URL=http://localhost:4000/api/v1 \
@@ -84,9 +92,11 @@ const waitFor = async (expression, timeout = 15000) => {
   }
   throw new Error(`timeout: ${expression.slice(0, 120)}`);
 };
-const key = async (k, code = k) => {
-  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, windowsVirtualKeyCode: { ArrowDown: 40, ArrowUp: 38, Enter: 13, Escape: 27 }[k] ?? 0 });
-  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code });
+/** modifiers: 8 = Shift (CDP bit flags). */
+const key = async (k, code = k, modifiers = 0) => {
+  const windowsVirtualKeyCode = { ArrowDown: 40, ArrowUp: 38, Enter: 13, Escape: 27, Tab: 9, ' ': 32 }[k] ?? 0;
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code, modifiers, windowsVirtualKeyCode });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, modifiers, windowsVirtualKeyCode });
 };
 const size = (width, height = 900) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
 const setCookie = () => send('Network.setCookie', { name: cookie.split('=')[0], value: cookie.split('=').slice(1).join('='), url: APP, httpOnly: true });
@@ -191,6 +201,76 @@ try {
     await waitFor(`document.querySelectorAll('.pilgrim-card').length > 0`);
     const phone = await evaluate(`(() => { const vw = document.documentElement.clientWidth; const btns = [...document.querySelectorAll('.pilgrim-card .btn')]; return { count: btns.length, inside: btns.every(b => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= vw; }), targets: btns.every(b => b.getBoundingClientRect().height >= 30) }; })()`);
     check(`phone ${name}: card actions inside the screen, usable size`, phone.count > 0 && phone.inside && phone.targets, JSON.stringify(phone));
+  }
+
+  // ---------------- clickable rows / cards and child actions
+  await size(1280, 900);
+  // Record any native dialog call (none must happen).
+  const NATIVE_TRAP = `(() => { window.__native = []; for (const n of ['alert', 'confirm', 'prompt']) window[n] = (...a) => { window.__native.push(n); return false; }; })()`;
+  await send('Page.navigate', { url: `${APP}/trips` });
+  await waitFor(`document.querySelectorAll('table.data tbody tr.row-link').length > 0`);
+  const tripHref = await evaluate(`document.querySelector('table.data tbody tr.row-link').dataset.href`);
+  // Click a plain cell (the departure date), not the name link.
+  await evaluate(`document.querySelector('table.data tbody tr.row-link').cells[1].click()`);
+  check('rows: clicking empty space in a trip row opens the trip', await waitFor(`location.pathname === ${JSON.stringify(tripHref)}`, 8000), await evaluate('location.pathname'));
+  await send('Page.navigate', { url: `${APP}/trips` });
+  await waitFor(`document.querySelectorAll('table.data tbody tr.row-link').length > 0`);
+  // Reach the row from its own link with Shift+Tab (keyboard focus → :focus-visible).
+  await evaluate(`document.querySelector('table.data tbody tr.row-link a').focus()`);
+  await key('Tab', 'Tab', 8);
+  const focusRing = await evaluate(`document.activeElement.matches('tr.row-link') ? getComputedStyle(document.activeElement).outlineStyle : 'not-on-row'`);
+  await key('Enter');
+  check('rows: Enter on a focused row opens it (with a visible focus ring)', (await waitFor(`location.pathname === ${JSON.stringify(tripHref)}`, 8000)) && focusRing === 'solid', focusRing);
+  await send('Page.navigate', { url: `${APP}/trips` });
+  await waitFor(`document.querySelectorAll('table.data tbody tr.row-link').length > 0`);
+  await evaluate(`(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; document.querySelector('table.data tbody tr.row-link').cells[1].dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true })); })()`);
+  check('rows: Ctrl+click opens the detail in a new tab and stays on the list', (await evaluate(`location.pathname === '/trips' && window.__opened[0] === ${JSON.stringify(tripHref)}`)));
+
+  await send('Page.navigate', { url: `${APP}/delegates` });
+  await waitFor(`[...document.querySelectorAll('table.data tbody tr.row-link button')].some((b) => /^(إيقاف|تفعيل)$/.test(b.textContent.trim()))`);
+  await evaluate(NATIVE_TRAP);
+  // Prefer a destructive action (إيقاف) so the safe-focus rule is exercised.
+  await evaluate(`(() => { const all = [...document.querySelectorAll('table.data tbody tr.row-link button')]; (all.find((b) => b.textContent.trim() === 'إيقاف') ?? all.find((b) => b.textContent.trim() === 'تفعيل')).setAttribute('data-trigger', '1'); })()`);
+  await evaluate(`document.querySelector('[data-trigger]').focus(); document.querySelector('[data-trigger]').click()`);
+  const dialogOpen = await waitFor(`!!document.querySelector('.modal[role=dialog]')`, 5000);
+  check('actions: a row button runs its own action (dialog) without navigating', dialogOpen && (await evaluate(`location.pathname === '/delegates'`)));
+  const dlg = await evaluate(`(() => { const d = document.querySelector('.modal[role=dialog]'); const t = document.getElementById(d.getAttribute('aria-labelledby')); return { modal: d.getAttribute('aria-modal'), title: t?.textContent, focus: document.activeElement?.textContent.trim(), buttons: [...d.querySelectorAll('.modal-footer button')].map((b) => b.textContent.trim()), native: window.__native.length }; })()`);
+  check('dialog: shared ConfirmDialog (aria-modal, titled, Arabic actions), no native dialog', dlg.modal === 'true' && /المندوب/.test(dlg.title ?? '') && dlg.buttons[0] === 'رجوع' && /المندوب$/.test(dlg.buttons[1] ?? '') && dlg.native === 0, JSON.stringify(dlg));
+  check('dialog: destructive confirmation (إيقاف) starts on «رجوع»', /إيقاف/.test(dlg.title ?? '') && dlg.focus === 'رجوع', `${dlg.title} / ${dlg.focus}`);
+  const tabbed = [];
+  for (let i = 0; i < 6; i += 1) {
+    await key('Tab');
+    tabbed.push(await evaluate(`document.querySelector('.modal').contains(document.activeElement) ? (document.activeElement.textContent.trim() || document.activeElement.getAttribute('aria-label')) : 'OUTSIDE'`));
+  }
+  check('dialog: Tab cycles through the dialog controls and never leaves it', !tabbed.includes('OUTSIDE') && new Set(tabbed).size >= 2, tabbed.join(' → '));
+  await key('Escape');
+  check('dialog: Escape closes it and focus returns to the button', (await waitFor(`!document.querySelector('.modal')`, 3000)) && (await evaluate(`document.activeElement === document.querySelector('[data-trigger]')`)));
+
+  // List context: global pilgrims (filtered) → card/row → «رجوع» returns to the same list.
+  await send('Page.navigate', { url: `${APP}/pilgrims?status=ACTIVE&page=2` });
+  await waitFor(`document.querySelectorAll('table.data tbody tr.row-link').length > 0`);
+  await evaluate(`document.querySelector('table.data tbody tr.row-link').cells[2].click()`);
+  await waitFor(`/^\\/pilgrims\\/[0-9a-f-]+$/.test(location.pathname) && [...document.querySelectorAll('button')].some((b) => b.textContent.includes('رجوع لقائمة المعتمرين'))`, 10000);
+  await evaluate(`[...document.querySelectorAll('button')].find((b) => b.textContent.includes('رجوع لقائمة المعتمرين')).click()`);
+  check('rows: pilgrim opened from a filtered list returns to that list', await waitFor(`location.pathname + location.search === '/pilgrims?status=ACTIVE&page=2'`, 8000), await evaluate('location.pathname + location.search'));
+
+  // ---------------- phone: account tabs and cards
+  await size(360, 800);
+  await send('Page.navigate', { url: `${APP}/accounts` });
+  await waitFor(`document.querySelectorAll('.account-card').length > 0`);
+  const tabs = await evaluate(`(() => { const vw = document.documentElement.clientWidth; const t = [...document.querySelectorAll('.filter-tabs .tab')]; return { count: t.length, inside: t.every((b) => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= vw && r.width > 0; }) }; })()`);
+  check('phone (360): all four account tabs fully visible', tabs.count === 4 && tabs.inside, JSON.stringify(tabs));
+  const cardHref = await evaluate(`document.querySelector('.account-card').dataset.href`);
+  await evaluate(`document.querySelector('.account-card .account-card-figures').click()`);
+  check('phone: tapping an account card opens the account', await waitFor(`location.pathname === ${JSON.stringify(cardHref)}`, 8000), await evaluate('location.pathname'));
+
+  // ---------------- Western digits on financial pages
+  await size(1280, 900);
+  for (const route of ['/dashboard', '/accounts', '/payments', '/finance/movements', '/expenses', cardHref]) {
+    await send('Page.navigate', { url: `${APP}${route}` });
+    await waitFor(`!!document.querySelector('.page-header') && !document.querySelector('.spinner, .skeleton, .loading-row')`);
+    await sleep(300);
+    check(`digits: ${route} shows Western digits only`, await evaluate(`!/[٠-٩۰-۹]/.test(document.querySelector('.main').innerText)`));
   }
 } catch (error) {
   check('run', false, error.message);

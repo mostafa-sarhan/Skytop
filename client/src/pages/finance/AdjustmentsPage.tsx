@@ -87,6 +87,7 @@ const AdjustmentModal = ({
     <Modal
       title={modeLabel[mode]}
       onClose={onClose}
+      dismissible={!submitting}
       footer={
         <>
           <button type="button" className="btn secondary" onClick={onClose}>

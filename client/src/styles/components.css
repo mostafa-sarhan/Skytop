@@ -2263,3 +2263,25 @@ table.data td.name-cell {
     border-radius: 12px;
   }
 }
+
+/* ------------------------------------------------------- clickable rows */
+
+/* Rows / cards that open their detail page (lib/rowLink). */
+.row-link {
+  cursor: pointer;
+}
+
+table.data tbody tr.row-link:hover,
+.row-link:is(li):hover {
+  background: var(--brand-50);
+}
+
+.row-link:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+}
+
+/* Buttons and links inside keep their own cursor. */
+.row-link :is(a, button, input, select, label) {
+  cursor: pointer;
+}
