@@ -19,7 +19,8 @@ export const requestContext = (req: Request, res: Response, next: NextFunction):
   const started = process.hrtime.bigint();
   res.on('finish', () => {
     const durationMs = Number((process.hrtime.bigint() - started) / 1_000_000n);
-    const path = `${req.baseUrl}${req.path}`;
+    // Path only: query strings may carry search terms (names, numbers).
+    const path = req.originalUrl.split('?')[0] ?? req.path;
     const meta = {
       requestId: req.id,
       method: req.method,

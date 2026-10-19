@@ -9,24 +9,8 @@
       /* First-frame background before the stylesheet loads (matches --bg). */
       html[data-theme='dark'] { background: #13111b; color-scheme: dark; }
     </style>
-    <script>
-      // Apply the saved theme (or the dark default) before the first paint to
-      // avoid a light/dark flash. Mirrors resolveInitialTheme() in
-      // src/theme/theme.ts — keep the storage key in sync.
-      (function () {
-        var theme;
-        try {
-          theme = localStorage.getItem('skytop-theme');
-        } catch (e) {}
-        if (theme !== 'light' && theme !== 'dark') {
-          theme = 'dark'; // product default; the OS preference is not used
-        }
-        document.documentElement.setAttribute('data-theme', theme);
-        if (theme === 'dark') {
-          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#1b1826');
-        }
-      })();
-    </script>
+    <!-- Saved theme (or dark default) before the first paint: see public/theme-init.js -->
+    <script src="/theme-init.js"></script>
     <meta
       name="description"
       content="سكاي توب — نظام الإدارة الداخلية لإدارة الرحلات والمعتمرين والمندوبين والتحصيل المالي"

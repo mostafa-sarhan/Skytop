@@ -5,9 +5,9 @@
  *
  * First visit: dark. After the user toggles, the saved choice always wins.
  *
- * index.html runs a tiny inline copy of `resolveInitialTheme` before the app
- * loads so the first paint already uses the right theme (no flash). Keep the
- * storage key in sync with that script.
+ * index.html loads public/theme-init.js (a tiny copy of `resolveInitialTheme`)
+ * as a blocking script before the app, so the first paint already uses the
+ * right theme (no flash). Keep the storage key in sync with that script.
  */
 
 export type Theme = 'light' | 'dark';

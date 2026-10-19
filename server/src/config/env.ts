@@ -55,7 +55,9 @@ const envSchema = z.object({
   /** Optional: serve the built client from the API process (local rehearsal only; Nginx does this in production). */
   SERVE_CLIENT_DIR: z.string().optional(),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
-  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+  // Per client IP. Office staff usually share one public IP (NAT), so this is
+  // sized for the whole office; login has its own stricter limits.
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(1200),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
   LOGIN_FAILURES_PER_ACCOUNT: z.coerce.number().int().positive().default(10),
   SENSITIVE_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),

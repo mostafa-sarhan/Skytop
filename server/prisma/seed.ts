@@ -56,7 +56,9 @@ async function main(): Promise<void> {
   // First manager (production bootstrap). Username and password are required
   // and must follow the policy when the account is created.
   const managerUsername = (process.env.SEED_MANAGER_USERNAME ?? '').trim().toLowerCase();
-  if (!managerUsername) throw new Error('SEED_MANAGER_USERNAME is required to run the seed (set it in server/.env)');
+  if (!managerUsername || managerUsername === 'change_me') {
+    throw new Error('SEED_MANAGER_USERNAME is required to run the seed (set a real username in server/.env)');
+  }
   const managerPassword = requiredSecret('SEED_MANAGER_PASSWORD');
 
   const manager = await ensureUser({
@@ -73,7 +75,11 @@ async function main(): Promise<void> {
   const employeePassword = process.env.SEED_EMPLOYEE_PASSWORD;
   const employee = employeePassword
     ? await ensureUser({
-        username: env('SEED_EMPLOYEE_USERNAME', 'employee').trim().toLowerCase(),
+        username: (() => {
+          const name = env('SEED_EMPLOYEE_USERNAME', 'employee').trim().toLowerCase();
+          if (name === 'change_me') throw new Error('SEED_EMPLOYEE_USERNAME still has the placeholder value');
+          return name;
+        })(),
         password: requiredSecret('SEED_EMPLOYEE_PASSWORD'),
         fullName: env('SEED_EMPLOYEE_FULL_NAME', 'موظف العمليات'),
         role: Role.EMPLOYEE,

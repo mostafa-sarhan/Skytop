@@ -232,7 +232,7 @@ export const AdjustmentsPage = () => {
                           <Badge tone={row.type === 'REFUND' ? 'info' : 'warning'}>{adjustmentTypeLabel[row.type]}</Badge>
                           {row.direction ? <div className="muted small">{adjustmentDirectionLabel[row.direction]}</div> : null}
                         </td>
-                        <td className="primary-cell">{row.delegate.name}</td>
+                        <td className="name-cell primary-cell">{row.delegate.name}</td>
                         <td className="num mono">
                           <strong>{formatAmount(row.amount)}</strong>
                         </td>

@@ -1,0 +1,49 @@
+# /etc/systemd/system/skytop-api.service — Sky Top API (Node.js, compiled build).
+# Install: sudo cp deploy/systemd/skytop-api.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now skytop-api
+# Logs:    journalctl -u skytop-api -f        (JSON lines, one per request)
+
+[Unit]
+Description=Sky Top API
+Documentation=file:///opt/skytop/app/deploy/README.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=skytop
+Group=skytop
+WorkingDirectory=/opt/skytop/app/server
+EnvironmentFile=/etc/skytop/server.env
+# Compiled entry point (npm run build). Never tsx/watch in production.
+ExecStart=/usr/bin/node dist/src/server.js
+Restart=on-failure
+RestartSec=5
+# SIGTERM → graceful shutdown (in-flight requests finish, Prisma disconnects);
+# the app force-exits after 10 s, systemd after 20 s.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# Hardening: read-only system, only the uploads folder is writable.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/skytop/uploads
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

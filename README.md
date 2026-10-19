@@ -1,5 +1,20 @@
 # Skytop
 
+## Production
+
+Deployment (Hostinger VPS: Nginx + HTTPS, systemd, PostgreSQL, private
+uploads, backups / restore): see [`deploy/README.md`](deploy/README.md).
+
+## Checks and tests
+
+```bash
+cd server && npm run typecheck && npm run build
+cd server && npm run test:api            # API integration tests on a dedicated *_test database
+cd client && npm run lint && npm run build && npm run check:dialogs
+# Browser checks against a running stack (APP_URL, API_URL, CHECK_USER, CHECK_PASSWORD):
+cd client && npm run check:ui && ROUTES=all npm run check:rtl
+```
+
 ## Demo data (development only)
 
 A large, realistic demo dataset (30 delegates, ~900 pilgrims, 17 trips, payments,

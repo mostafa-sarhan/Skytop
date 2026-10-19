@@ -126,7 +126,7 @@ export const MovementsPage = () => {
                     {data.items.map((row) => (
                       <tr key={row.id}>
                         <td className="mono">{formatDate(row.date)}</td>
-                        <td className="primary-cell">
+                        <td className="name-cell primary-cell">
                           <Link to={`/accounts/${row.delegate.id}`}>{row.delegate.name}</Link>
                         </td>
                         <td>{movementKindLabel[row.kind]}</td>
