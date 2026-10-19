@@ -5,6 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 import { LoadingBlock, Modal, Field, TextInput } from '../ui/primitives';
 import { useToast } from '../ui/Toast';
 import { errorMessage } from '../api/client';
+import { PasswordRules } from '../ui/PasswordRules';
+import { passwordIsValid } from '../lib/credentials';
 
 export const RequireAuth = ({ children }: { children: ReactNode }) => {
   const { user, loading } = useAuth();
@@ -34,7 +36,7 @@ export const RequireManager = ({ children }: { children: ReactNode }) => {
 };
 
 export const ChangePasswordModal = ({ onClose }: { onClose: () => void }) => {
-  const { changePassword } = useAuth();
+  const { changePassword, user } = useAuth();
   const toast = useToast();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -77,7 +79,7 @@ export const ChangePasswordModal = ({ onClose }: { onClose: () => void }) => {
             type="button"
             className="btn"
             onClick={() => void submit()}
-            disabled={submitting || !currentPassword || !newPassword}
+            disabled={submitting || !currentPassword || !passwordIsValid(newPassword, user?.username) || newPassword !== confirm}
           >
             {submitting ? 'جارٍ الحفظ...' : 'حفظ'}
           </button>
@@ -94,7 +96,7 @@ export const ChangePasswordModal = ({ onClose }: { onClose: () => void }) => {
           autoComplete="current-password"
         />
       </Field>
-      <Field label="كلمة المرور الجديدة" required hint="8 أحرف على الأقل">
+      <Field label="كلمة المرور الجديدة" required>
         <TextInput
           type="password"
           dir="ltr"
@@ -102,6 +104,7 @@ export const ChangePasswordModal = ({ onClose }: { onClose: () => void }) => {
           onChange={(event) => setNewPassword(event.target.value)}
           autoComplete="new-password"
         />
+        <PasswordRules password={newPassword} username={user?.username} />
       </Field>
       <Field label="تأكيد كلمة المرور الجديدة" required>
         <TextInput

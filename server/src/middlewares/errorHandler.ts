@@ -8,17 +8,31 @@ import { formatZodIssues } from './validate';
 import { AppError } from '../utils/AppError';
 
 export const notFoundHandler = (req: Request, _res: Response, next: NextFunction): void => {
-  next(AppError.notFound(`لا يوجد مسار بهذا العنوان: ${req.method} ${req.originalUrl}`));
+  next(AppError.notFound(`لا يوجد مسار بهذا العنوان: ${req.method} ${req.path}`));
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+/** Errors raised by Express' body parsers (http-errors with a 4xx status). */
+const bodyParserError = (err: unknown): AppError | null => {
+  const e = err as { type?: unknown; status?: unknown; expose?: unknown };
+  if (typeof e?.status !== 'number' || e.status < 400 || e.status >= 500 || e.expose !== true) return null;
+  if (e.type === 'entity.too.large') return new AppError(413, 'حجم البيانات المرسلة أكبر من المسموح', 'PAYLOAD_TOO_LARGE');
+  if (e.type === 'entity.parse.failed') return AppError.badRequest('صيغة البيانات المرسلة غير صحيحة');
+  return new AppError(e.status, 'طلب غير صالح', 'BAD_REQUEST');
+};
+
 export const errorHandler = (
   err: unknown,
   req: Request,
   res: Response,
-  _next: NextFunction,
+  next: NextFunction,
 ): void => {
-  if (res.headersSent) return;
+  // Failed mid-response (e.g. a file stream broke): let Express close the
+  // connection instead of leaving the client hanging.
+  if (res.headersSent) {
+    logger.error('response_failed_after_headers', { method: req.method, path: req.path, error: err });
+    next(err);
+    return;
+  }
 
   let appError: AppError;
 
@@ -37,7 +51,7 @@ export const errorHandler = (
   } else if (err instanceof Prisma.PrismaClientValidationError) {
     appError = AppError.badRequest('طلب غير صالح من التطبيق');
   } else {
-    appError = AppError.internal();
+    appError = bodyParserError(err) ?? AppError.internal();
   }
 
   const logMeta = {
@@ -46,10 +60,11 @@ export const errorHandler = (
     status: appError.statusCode,
     code: appError.code,
     userId: req.user?.id,
-    requestId: req.header('x-request-id'),
+    requestId: req.id,
   };
 
   if (appError.statusCode >= 500) {
+    // Full technical detail stays in the server log only.
     logger.error('request_failed', { ...logMeta, error: err });
   } else {
     logger.warn('request_rejected', { ...logMeta, message: appError.message });
@@ -61,6 +76,7 @@ export const errorHandler = (
       code: appError.code,
       message: appError.message,
       details: appError.details,
+      requestId: req.id,
       ...(env.NODE_ENV === 'development' && appError.statusCode >= 500 && err instanceof Error
         ? { stack: err.stack }
         : {}),
@@ -70,12 +86,9 @@ export const errorHandler = (
 
 const mapPrismaError = (err: Prisma.PrismaClientKnownRequestError): AppError => {
   switch (err.code) {
-    case 'P2002': {
-      const target = (err.meta?.target as string[] | undefined)?.join(', ') ?? 'الحقل';
-      return AppError.conflict('القيمة المدخلة موجودة مسبقاً، يرجى استخدام قيمة أخرى', {
-        fields: target,
-      });
-    }
+    case 'P2002':
+      // Column / constraint names are internal: never sent to the client.
+      return AppError.conflict('القيمة المدخلة موجودة مسبقاً، يرجى استخدام قيمة أخرى');
     case 'P2025':
       return AppError.notFound();
     case 'P2003':

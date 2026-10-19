@@ -5,8 +5,7 @@ import * as movementService from '../services/financialMovements.service';
 import * as paymentService from '../services/payment.service';
 import * as accountService from '../services/delegateAccount.service';
 import { getActor } from '../utils/actor';
-import { created, ok, paginated } from '../utils/http';
-import { contentDisposition } from '../utils/contentDisposition';
+import { created, ok, paginated, sendPrivateFile } from '../utils/http';
 import {
   AdjustmentListQuery,
   DelegateAccountsQuery,
@@ -35,18 +34,7 @@ export const receiptScan = async (req: Request, res: Response): Promise<void> =>
   const { id } = getParams<{ id: string }>(req);
   const file = await paymentService.getPaymentReceiptScan(id);
 
-  res.setHeader('Content-Type', file.mime);
-  if (file.size !== undefined) res.setHeader('Content-Length', String(file.size));
-  res.setHeader('Cache-Control', 'private, no-store');
-  res.setHeader('Content-Disposition', contentDisposition('inline', file.originalName));
-
-  const fs = await import('fs');
-  await new Promise<void>((resolve, reject) => {
-    const stream = fs.createReadStream(file.absolutePath);
-    stream.on('error', reject);
-    stream.on('end', resolve);
-    stream.pipe(res);
-  });
+  await sendPrivateFile(res, file);
 };
 
 export const voidPayment = async (req: Request, res: Response): Promise<void> => {

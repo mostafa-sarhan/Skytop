@@ -2,19 +2,22 @@ import { RequestHandler } from 'express';
 import multer from 'multer';
 import { env } from '../config/env';
 import { AppError } from '../utils/AppError';
+import { uploadRateLimit } from './rateLimit';
 
 // Files are kept in memory only until validated and written to private storage.
 const storage = multer.memoryStorage();
+// The text fields of an upload form are small; cap them like the JSON body.
+const FIELD_LIMITS = { fields: 30, fieldSize: 64 * 1024, parts: 40 };
 
 export const uploadSingle = multer({
   storage,
-  limits: { fileSize: env.MAX_UPLOAD_BYTES, files: 1 },
+  limits: { ...FIELD_LIMITS, fileSize: env.MAX_UPLOAD_BYTES, files: 1 },
 }).single('file');
 
 /** New pilgrim: required passport image + optional personal photo. */
 export const uploadPilgrimCreateFiles = multer({
   storage,
-  limits: { fileSize: env.MAX_UPLOAD_BYTES, files: 2 },
+  limits: { ...FIELD_LIMITS, fileSize: env.MAX_UPLOAD_BYTES, files: 2 },
 }).fields([
   { name: 'passportImage', maxCount: 1 },
   { name: 'personalPhoto', maxCount: 1 },
@@ -46,19 +49,24 @@ const fixFileNames = (req: Parameters<RequestHandler>[0]) => {
   for (const file of files) file.originalname = utf8Name(file.originalname);
 };
 
-/** Runs a multer handler and turns its errors into clear Arabic AppErrors. */
+/**
+ * Runs a multer handler (after the per-user upload rate limit) and turns its
+ * errors into clear Arabic AppErrors.
+ */
 export const runMulter =
   (handler: RequestHandler, fallbackMessage = 'تعذر رفع الملف'): RequestHandler =>
   (req, res, next) => {
-    handler(req, res, (error: unknown) => {
-      if (!error) {
-        fixFileNames(req);
-        return next();
-      }
-      if (error instanceof AppError) return next(error);
-      if (error instanceof multer.MulterError) {
-        return next(AppError.badRequest(multerMessage(error), { field: error.field }));
-      }
-      return next(AppError.badRequest(fallbackMessage));
-    });
+    const parse = () =>
+      handler(req, res, (error: unknown) => {
+        if (!error) {
+          fixFileNames(req);
+          return next();
+        }
+        if (error instanceof AppError) return next(error);
+        if (error instanceof multer.MulterError) {
+          return next(AppError.badRequest(multerMessage(error), { field: error.field }));
+        }
+        return next(AppError.badRequest(fallbackMessage));
+      });
+    void uploadRateLimit(req, res, (limited?: unknown) => (limited ? next(limited) : parse()));
   };

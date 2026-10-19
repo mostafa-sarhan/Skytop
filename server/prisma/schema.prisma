@@ -85,6 +85,8 @@ enum AuditAction {
   USER_ACTIVATED
   USER_DEACTIVATED
   PASSWORD_RESET
+  PASSWORD_CHANGED
+  USERNAME_CHANGED
   DELEGATE_CREATED
   DELEGATE_UPDATED
   DELEGATE_STATUS_CHANGED
@@ -106,6 +108,8 @@ model User {
   mustChangePassword Boolean   @default(false)
   lastLoginAt        DateTime?
   passwordResetAt    DateTime?
+  /// Bumped on password change / reset and deactivation: older tokens stop working.
+  sessionVersion     Int       @default(0)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

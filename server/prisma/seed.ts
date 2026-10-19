@@ -1,6 +1,9 @@
 import { PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { SYSTEM_DELEGATE_NAME } from '../src/config/app';
+import { passwordProblems, usernameProblems } from '../src/utils/credentials';
+
+const BCRYPT_ROUNDS = 12;
 
 const prisma = new PrismaClient();
 
@@ -15,40 +18,69 @@ const requiredSecret = (key: string): string => {
   return value;
 };
 
+/**
+ * Creates the account when it does not exist yet (the NEW username and
+ * password must satisfy the credential policy). An existing account keeps its
+ * username and password; it is only ensured active with the expected role.
+ * Passwords are never printed.
+ */
+const ensureUser = async (input: {
+  username: string;
+  password: string;
+  fullName: string;
+  role: Role;
+  passwordKey: string;
+  usernameKey: string;
+}) => {
+  const existing = await prisma.user.findUnique({ where: { username: input.username } });
+  if (existing) {
+    return prisma.user.update({ where: { id: existing.id }, data: { role: input.role, isActive: true } });
+  }
+  const problems = [
+    ...usernameProblems(input.username).map((m) => `${input.usernameKey}: ${m}`),
+    ...passwordProblems(input.password, input.username).map((m) => `${input.passwordKey}: ${m}`),
+  ];
+  if (problems.length) throw new Error(`Refusing to create "${input.username}":\n- ${problems.join('\n- ')}`);
+  return prisma.user.create({
+    data: {
+      username: input.username,
+      fullName: input.fullName,
+      passwordHash: await bcrypt.hash(input.password, BCRYPT_ROUNDS),
+      role: input.role,
+      mustChangePassword: false,
+    },
+  });
+};
+
 async function main(): Promise<void> {
-  // Check both before touching the database.
+  // First manager (production bootstrap). Username and password are required
+  // and must follow the policy when the account is created.
+  const managerUsername = (process.env.SEED_MANAGER_USERNAME ?? '').trim().toLowerCase();
+  if (!managerUsername) throw new Error('SEED_MANAGER_USERNAME is required to run the seed (set it in server/.env)');
   const managerPassword = requiredSecret('SEED_MANAGER_PASSWORD');
-  const employeePassword = requiredSecret('SEED_EMPLOYEE_PASSWORD');
-  const managerUsername = env('SEED_MANAGER_USERNAME', 'admin').toLowerCase();
-  const managerName = env('SEED_MANAGER_FULL_NAME', 'مدير النظام');
-  const employeeUsername = env('SEED_EMPLOYEE_USERNAME', 'employee').toLowerCase();
 
-  const passwordHash = await bcrypt.hash(managerPassword, 12);
-
-  const manager = await prisma.user.upsert({
-    where: { username: managerUsername },
-    update: { role: Role.MANAGER, isActive: true },
-    create: {
-      username: managerUsername,
-      fullName: managerName,
-      passwordHash,
-      role: Role.MANAGER,
-      mustChangePassword: false,
-    },
+  const manager = await ensureUser({
+    username: managerUsername,
+    password: managerPassword,
+    fullName: env('SEED_MANAGER_FULL_NAME', 'مدير النظام'),
+    role: Role.MANAGER,
+    usernameKey: 'SEED_MANAGER_USERNAME',
+    passwordKey: 'SEED_MANAGER_PASSWORD',
   });
 
-  const employeeHash = await bcrypt.hash(employeePassword, 12);
-  const employee = await prisma.user.upsert({
-    where: { username: employeeUsername },
-    update: { role: Role.EMPLOYEE, isActive: true },
-    create: {
-      username: employeeUsername,
-      fullName: env('SEED_EMPLOYEE_FULL_NAME', 'موظف العمليات'),
-      passwordHash: employeeHash,
-      role: Role.EMPLOYEE,
-      mustChangePassword: false,
-    },
-  });
+  // Optional starter employee: only when SEED_EMPLOYEE_PASSWORD is set
+  // (production can create employees from the Users page instead).
+  const employeePassword = process.env.SEED_EMPLOYEE_PASSWORD;
+  const employee = employeePassword
+    ? await ensureUser({
+        username: env('SEED_EMPLOYEE_USERNAME', 'employee').trim().toLowerCase(),
+        password: requiredSecret('SEED_EMPLOYEE_PASSWORD'),
+        fullName: env('SEED_EMPLOYEE_FULL_NAME', 'موظف العمليات'),
+        role: Role.EMPLOYEE,
+        usernameKey: 'SEED_EMPLOYEE_USERNAME',
+        passwordKey: 'SEED_EMPLOYEE_PASSWORD',
+      })
+    : null;
 
   const systemDelegate = await prisma.delegate.findFirst({
     where: { isSystem: true },
@@ -75,7 +107,7 @@ async function main(): Promise<void> {
 
   console.log('Seed completed:');
   console.log(`  manager  -> ${manager.username} (${manager.role})`);
-  console.log(`  employee -> ${employee.username} (${employee.role})`);
+  console.log(employee ? `  employee -> ${employee.username} (${employee.role})` : '  employee -> (not requested)');
   console.log(`  system delegate -> ${delegate.name}`);
 }
 

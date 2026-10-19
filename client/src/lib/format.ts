@@ -170,6 +170,8 @@ export const auditActionLabel: Record<string, string> = {
   USER_ACTIVATED: 'تفعيل مستخدم',
   USER_DEACTIVATED: 'إيقاف مستخدم',
   PASSWORD_RESET: 'إعادة تعيين كلمة مرور',
+  PASSWORD_CHANGED: 'تغيير كلمة المرور',
+  USERNAME_CHANGED: 'تغيير اسم المستخدم',
   DELEGATE_CREATED: 'إضافة مندوب',
   DELEGATE_UPDATED: 'تعديل مندوب',
   DELEGATE_STATUS_CHANGED: 'تغيير حالة مندوب',

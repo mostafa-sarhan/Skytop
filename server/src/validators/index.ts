@@ -23,28 +23,41 @@ import {
   uuidParam,
 } from './common';
 import { normalizeReceiptNumber } from '../utils/receiptNumber';
+import { passwordProblems, usernameProblems } from '../utils/credentials';
 
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
 
+// Login accepts any existing account: legacy short usernames and passwords
+// created before the current policy keep working (only NEW credentials are
+// checked against utils/credentials).
 export const loginSchema = z
   .object({
-    username: z.string().trim().min(3, 'اسم المستخدم غير صحيح').max(80),
-    password: z.string().min(6, 'كلمة المرور غير صحيحة').max(200),
+    username: z.string().trim().min(1, 'يجب إدخال اسم المستخدم').max(80),
+    password: z.string().min(1, 'يجب إدخال كلمة المرور').max(200),
   })
   .strict();
 
+/** A new password (create / reset / change): see utils/credentials. */
+const newPassword = (field = 'كلمة المرور') =>
+  z
+    .string({ required_error: `يجب إدخال ${field}` })
+    .max(200, 'كلمة المرور طويلة جداً')
+    .superRefine((value, ctx) => {
+      for (const message of passwordProblems(value)) ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    });
+
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(6).max(200),
-    newPassword: z.string().min(8, 'كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف').max(200),
+    currentPassword: z.string().min(1, 'يجب إدخال كلمة المرور الحالية').max(200),
+    newPassword: newPassword('كلمة المرور الجديدة'),
   })
   .strict();
 
 export const resetPasswordSchema = z
   .object({
-    newPassword: z.string().min(8, 'كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف').max(200),
+    newPassword: newPassword('كلمة المرور الجديدة'),
     mustChangePassword: z.boolean().default(true),
   })
   .strict();
@@ -53,23 +66,41 @@ export const resetPasswordSchema = z
 // Users (manager only)
 // ---------------------------------------------------------------------------
 
+/** A NEW login name (existing short usernames are kept and still log in). */
+const newUsername = z
+  .string({ required_error: 'يجب إدخال اسم المستخدم' })
+  .trim()
+  .transform((value) => value.toLowerCase())
+  .superRefine((value, ctx) => {
+    for (const message of usernameProblems(value)) ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+  });
+
 export const createUserSchema = z
   .object({
     fullName: arabicName,
-    username: z
-      .string()
-      .trim()
-      .min(3, 'اسم المستخدم يجب ألا يقل عن 3 أحرف')
-      .max(80)
-      .regex(/^[a-zA-Z0-9._-]+$/, 'اسم المستخدم يجب أن يتكون من حروف إنجليزية وأرقام فقط'),
-    password: z.string().min(8, 'كلمة المرور يجب ألا تقل عن 8 أحرف').max(200),
+    username: newUsername,
+    password: newPassword(),
     role: z.nativeEnum(Role),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.username.length >= 3 && value.password.toLowerCase().includes(value.username)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['password'], message: 'كلمة المرور يجب ألا تحتوي على اسم المستخدم' });
+    }
+  });
 
 export const updateUserSchema = z
   .object({
     fullName: arabicName.optional(),
+    // Optional rename. The username policy applies only when the value
+    // actually changes (checked in the service): an unchanged legacy short
+    // username can be sent back as-is.
+    username: z
+      .string()
+      .trim()
+      .max(80)
+      .transform((value) => value.toLowerCase())
+      .optional(),
     role: z.nativeEnum(Role).optional(),
     isActive: z.boolean().optional(),
   })

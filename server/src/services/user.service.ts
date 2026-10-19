@@ -5,6 +5,7 @@ import { writeAuditLog } from '../utils/audit';
 import { buildPage } from '../utils/pagination';
 import { hashPassword } from './auth.service';
 import { withTransaction } from '../utils/transaction';
+import { usernameProblems } from '../utils/credentials';
 
 const userSelect = {
   id: true,
@@ -95,7 +96,7 @@ export const createUser = async (actorId: string, input: {
 export const updateUser = async (
   actorId: string,
   userId: string,
-  input: { fullName?: string; role?: Role; isActive?: boolean },
+  input: { fullName?: string; username?: string; role?: Role; isActive?: boolean },
 ) => {
   if (actorId === userId && (input.isActive === false || input.role)) {
     throw AppError.badRequest('لا يمكنك تعديل صلاحيات حسابك الحالي');
@@ -105,15 +106,49 @@ export const updateUser = async (
     const current = await tx.user.findUnique({ where: { id: userId }, select: userSelect });
     if (!current) throw AppError.notFound('الحساب غير موجود');
 
+    // A NEW username must follow the policy (≥ 6, allowed characters); an
+    // unchanged legacy short username is simply kept.
+    const renaming = input.username !== undefined && input.username !== current.username;
+    if (renaming) {
+      const problems = usernameProblems(input.username!);
+      if (problems.length) {
+        throw AppError.unprocessable(
+          'بيانات الإدخال غير صحيحة',
+          problems.map((message) => ({ field: 'username', message })),
+        );
+      }
+      const taken = await tx.user.findUnique({ where: { username: input.username }, select: { id: true } });
+      if (taken) throw AppError.conflict('اسم المستخدم مستخدم بالفعل', { field: 'username' });
+    }
+    const deactivating = input.isActive === false && current.isActive;
+
     const user = await tx.user.update({
       where: { id: userId },
       data: {
         ...(input.fullName !== undefined ? { fullName: input.fullName } : {}),
+        ...(renaming ? { username: input.username } : {}),
         ...(input.role !== undefined ? { role: input.role } : {}),
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+        // Deactivation ends every open session; reactivating later does not
+        // bring old tokens back.
+        ...(deactivating ? { sessionVersion: { increment: 1 } } : {}),
       },
       select: userSelect,
     });
+
+    if (renaming) {
+      await writeAuditLog(
+        {
+          userId: actorId,
+          action: 'USERNAME_CHANGED',
+          entityType: 'User',
+          entityId: userId,
+          oldData: { username: current.username },
+          newData: { username: user.username },
+        },
+        tx,
+      );
+    }
 
     // Status and role are audited independently (both may change at once).
     if (input.isActive !== undefined && input.isActive !== current.isActive) {
@@ -160,7 +195,8 @@ export const resetPassword = async (
   await withTransaction(async (tx) => {
     await tx.user.update({
       where: { id: userId },
-      data: { passwordHash, mustChangePassword: true, passwordResetAt: new Date() },
+      // New password: every existing session of this account ends.
+      data: { passwordHash, mustChangePassword: true, passwordResetAt: new Date(), sessionVersion: { increment: 1 } },
     });
 
     await writeAuditLog(

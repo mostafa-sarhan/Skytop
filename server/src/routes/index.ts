@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middlewares/authenticate';
 import authRoutes from './auth.routes';
+import healthRoutes from './health.routes';
 import userRoutes from './user.routes';
 import delegateRoutes from './delegate.routes';
 import tripRoutes from './trip.routes';
@@ -15,9 +16,9 @@ import expenseRoutes from './expense.routes';
 
 const router = Router();
 
-router.get('/health', (_req, res) => {
-  res.json({ success: true, data: { status: 'ok', uptime: process.uptime() } });
-});
+// Public, unauthenticated: GET /api/v1/health (readiness: API + database)
+// and GET /api/v1/health/live (liveness: process only).
+router.use('/health', healthRoutes);
 
 router.use('/auth', authRoutes);
 

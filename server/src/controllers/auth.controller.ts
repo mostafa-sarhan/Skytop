@@ -28,6 +28,8 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
     currentPassword: string;
     newPassword: string;
   };
-  await authService.changePassword(actor.id, currentPassword, newPassword);
+  const { token } = await authService.changePassword(actor.id, currentPassword, newPassword);
+  // Other sessions of this account are now invalid; keep this one signed in.
+  setAuthCookie(res, token);
   ok(res, { changed: true });
 };

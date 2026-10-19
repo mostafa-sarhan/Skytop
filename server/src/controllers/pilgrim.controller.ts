@@ -4,10 +4,9 @@ import { getParams, getQuery } from '../middlewares/validate';
 import * as pilgrimService from '../services/pilgrim.service';
 import * as documentStorage from '../modules/documents/storage';
 import { getActor } from '../utils/actor';
-import { created, ok, paginated } from '../utils/http';
+import { created, ok, paginated, sendPrivateFile } from '../utils/http';
 import { PilgrimListQuery } from '../validators';
 import { AppError } from '../utils/AppError';
-import { contentDisposition } from '../utils/contentDisposition';
 
 export const list = async (req: Request, res: Response): Promise<void> => {
   const query = getQuery<PilgrimListQuery>(req);
@@ -93,19 +92,5 @@ export const downloadDocument = async (req: Request, res: Response): Promise<voi
   }>(req);
   const file = await documentStorage.getPilgrimDocumentFile(pilgrimId, type);
 
-  res.setHeader('Content-Type', file.mime);
-  res.setHeader('Content-Length', String(file.size));
-  res.setHeader('Cache-Control', 'private, no-store');
-  res.setHeader(
-    'Content-Disposition',
-    contentDisposition('inline', file.originalName),
-  );
-
-  const fs = await import('fs');
-  await new Promise<void>((resolve, reject) => {
-    const stream = fs.createReadStream(file.absolutePath);
-    stream.on('error', reject);
-    stream.on('end', resolve);
-    stream.pipe(res);
-  });
+  await sendPrivateFile(res, file);
 };

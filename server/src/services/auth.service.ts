@@ -3,6 +3,9 @@ import { prisma } from '../config/database';
 import { AuthUser } from '../types';
 import { AppError } from '../utils/AppError';
 import { signAccessToken } from '../middlewares/authenticate';
+import { accountLock } from '../middlewares/rateLimit';
+import { writeAuditLog } from '../utils/audit';
+import { withTransaction } from '../utils/transaction';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -17,18 +20,28 @@ export interface LoginResult {
   token: string;
 }
 
-export const login = async (username: string, password: string): Promise<LoginResult> => {
-  const user = await prisma.user.findUnique({ where: { username: username.toLowerCase() } });
+export const login = async (rawUsername: string, password: string): Promise<LoginResult> => {
+  const username = rawUsername.trim().toLowerCase();
+  // Too many recent failures for this account (from any IP): refuse before
+  // checking the password so guessing cannot continue.
+  await accountLock.assertOpen(username);
+
+  const user = await prisma.user.findUnique({ where: { username } });
 
   // Constant-ish response: never reveal whether the username exists.
   if (!user) {
     await bcrypt.hash(password, BCRYPT_ROUNDS).catch(() => undefined);
+    await accountLock.recordFailure(username);
     throw AppError.unauthorized('اسم المستخدم أو كلمة المرور غير صحيحة');
   }
 
   const valid = await verifyPassword(password, user.passwordHash);
-  if (!valid) throw AppError.unauthorized('اسم المستخدم أو كلمة المرور غير صحيحة');
+  if (!valid) {
+    await accountLock.recordFailure(username);
+    throw AppError.unauthorized('اسم المستخدم أو كلمة المرور غير صحيحة');
+  }
   if (!user.isActive) throw AppError.unauthorized('حسابك موقوف، يرجى مراجعة الإدارة');
+  await accountLock.reset(username);
 
   await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
@@ -41,7 +54,7 @@ export const login = async (username: string, password: string): Promise<LoginRe
 
   return {
     user: { ...authUser, mustChangePassword: user.mustChangePassword },
-    token: signAccessToken(authUser),
+    token: signAccessToken(user),
   };
 };
 
@@ -63,24 +76,47 @@ export const getMe = async (userId: string) => {
   return user;
 };
 
+/**
+ * The user changes their own password. Every other session of this account
+ * ends (sessionVersion bump); the caller gets a fresh token for this one.
+ */
 export const changePassword = async (
   userId: string,
   currentPassword: string,
   newPassword: string,
-): Promise<void> => {
+): Promise<{ token: string }> => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw AppError.notFound('الحساب غير موجود');
 
   const valid = await verifyPassword(currentPassword, user.passwordHash);
-  if (!valid) throw AppError.badRequest('كلمة المرور الحالية غير صحيحة');
+  if (!valid) throw AppError.badRequest('كلمة المرور الحالية غير صحيحة', { field: 'currentPassword' });
 
   if (currentPassword === newPassword) {
-    throw AppError.badRequest('كلمة المرور الجديدة يجب أن تختلف عن الحالية');
+    throw AppError.badRequest('كلمة المرور الجديدة يجب أن تختلف عن الحالية', { field: 'newPassword' });
+  }
+  if (newPassword.toLowerCase().includes(user.username.toLowerCase()) && user.username.length >= 3) {
+    throw AppError.badRequest('كلمة المرور يجب ألا تحتوي على اسم المستخدم', { field: 'newPassword' });
   }
 
   const passwordHash = await hashPassword(newPassword);
-  await prisma.user.update({
-    where: { id: userId },
-    data: { passwordHash, mustChangePassword: false },
+  const updated = await withTransaction(async (tx) => {
+    const row = await tx.user.update({
+      where: { id: userId },
+      data: { passwordHash, mustChangePassword: false, sessionVersion: { increment: 1 } },
+      select: { id: true, sessionVersion: true },
+    });
+    await writeAuditLog(
+      {
+        userId,
+        action: 'PASSWORD_CHANGED',
+        entityType: 'User',
+        entityId: userId,
+        // Never store passwords, hashes or tokens in the audit trail.
+        newData: { username: user.username },
+      },
+      tx,
+    );
+    return row;
   });
+  return { token: signAccessToken(updated) };
 };

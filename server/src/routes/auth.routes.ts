@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { loginRateLimit } from '../middlewares/rateLimit';
+import { loginRateLimit, passwordChangeRateLimit } from '../middlewares/rateLimit';
 import { validateBody } from '../middlewares/validate';
 import { asyncHandler } from '../utils/asyncHandler';
 import * as authController from '../controllers/auth.controller';
@@ -14,6 +14,7 @@ router.get('/me', authenticate, asyncHandler(authController.me));
 router.post(
   '/change-password',
   authenticate,
+  passwordChangeRateLimit,
   validateBody(changePasswordSchema),
   asyncHandler(authController.changePassword),
 );
